@@ -160,6 +160,9 @@
 /* Define to use Lua */
 #cmakedefine HAVE_LUA 1
 
+/* Define to use mruby */
+#cmakedefine HAVE_MRUBY 1
+
 /* Define to use MIT kerberos */
 #cmakedefine HAVE_MIT_KERBEROS 1
 
