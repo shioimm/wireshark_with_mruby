@@ -1296,6 +1296,9 @@ ws_find_package(NGHTTP2 ENABLE_NGHTTP2 HAVE_NGHTTP2 "1.11.0")
 # Embedded Lua interpreter
 ws_find_package(LUA ENABLE_LUA HAVE_LUA "5.1")
 
+# Embedded mruby
+ws_find_package(MRUBY ENABLE_MRUBY HAVE_MRUBY)
+
 ws_find_package(NL ENABLE_NETLINK HAVE_LIBNL)
 
 ws_find_package(SBC ENABLE_SBC HAVE_SBC)
