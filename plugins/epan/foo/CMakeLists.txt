@@ -30,7 +30,7 @@ register_plugin_files(plugin.c
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(foo epan)
+add_wireshark_plugin_library(foo epan)
 
 target_link_libraries(foo epan ${MRUBY_LIBRARIES})
 target_include_directories(foo PRIVATE ${MRUBY_INCLUDE_DIRS})
