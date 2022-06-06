@@ -3,16 +3,17 @@
 
 #include <mruby.h>
 #include <mruby/compile.h>
+#include "ws_protocol.c"
 
-void proto_register_foo(void)
+void proto_register_proto1(void)
 {
 }
 
-void proto_reg_handoff_foo(void)
+void proto_reg_handoff_proto1(void)
 {
   mrb_state *mrb = mrb_open();
 
-  mrb_load_string(mrb, "puts 'Hello from mruby'");
+  mrb_ws_protocol_start(mrb, "../plugins/epan/foo/config.foo.rb");
 
   mrb_close(mrb);
 }
