@@ -61,6 +61,7 @@ wireshark-tap-register.c
 CMakeCache.txt
 CMakeFiles
 # CMakeListsCustom.txt # Disable for custom plugin
+CMakeUserPresets.json
 cmake_install.cmake
 CPackConfig.cmake
 CPackSourceConfig.cmake
