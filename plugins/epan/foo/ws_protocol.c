@@ -105,10 +105,10 @@ static void ws_protocol_add_subtree_items(mrb_state *mrb, mrb_value mrb_subtrees
     mrb_value mrb_depth   = mrb_iv_get(mrb,  mrb_subtree, mrb_intern_lit(mrb, "@depth"));
     gint ett = ws_protocol_detect_ett((int)mrb_fixnum(mrb_depth));
 
-    // WIP: 実装中 -----------------
+    // WIP: Need to set size and offset dynamically --
     proto_tree *subtree = proto_tree_add_subtree(ti, tvb,
                                                  0, 1, ett, NULL, mrb_string_cstr(mrb, mrb_name));
-    // -----------------------------
+    // -----------------------------------------------
 
     ws_protocol_add_items(mrb, mrb_items, subtree, tvb);
 
@@ -227,7 +227,7 @@ static void ws_protocol_register(mrb_state *mrb, mrb_value self)
     hf[i].hfinfo.type     = (int)mrb_fixnum(mrb_hf_type);
     hf[i].hfinfo.display  = (int)mrb_fixnum(mrb_hf_display);
     hf[i].hfinfo.strings  = !mrb_nil_p(mrb_hf_plabels) ? VALS(hf_packet_labels) : NULL;
-    hf[i].hfinfo.bitmask  = 0;    // WIP?;
+    hf[i].hfinfo.bitmask  = 0;    // WIP (Advanced feat)
     hf[i].hfinfo.blurb    = NULL;
     hf[i].hfinfo.id       = -1;
     hf[i].hfinfo.parent   = 0;
@@ -307,9 +307,9 @@ static mrb_value mrb_ws_protocol_packet(mrb_state *mrb, mrb_value _self)
 
   mrb_value mrb_packet = mrb_nil_value();
 
-  // WIP: -----------
+  // WIP: Need to add support other packet types --
   mrb_sym type_gint8 = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "gint8"));
-  // ----------------
+  // ----------------------------------------------
 
   if (type == type_gint8) {
     gint8 packet = tvb_get_gint8(_ws_tvb, (int)offset);
