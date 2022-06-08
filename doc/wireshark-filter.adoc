@@ -109,7 +109,7 @@ The "contains" operator cannot be used on atomic fields,
 such as numbers or IP addresses.
 
 The "matches" or "~" operator allows a filter to apply to a specified
-Perl-compatible regular expression (PCRE).  The regular expression must
+Perl-compatible regular expression (PCRE2).  The regular expression must
 be a double quoted string.  The left hand side of the "matches" operator
 must be a string, which can be a non-stringlike field implicitly or
 explicitly converted to a string.  Matches are case-insensitive by default.
@@ -124,10 +124,10 @@ You can force case sensitivity using
 
     wsp.header.user_agent matches "(?-i)cldc"
 
-This is an example of PCRE's *(?*+option+*)* construct. *(?-i)* performs a
+This is an example of PCRE2's *(?*+option+*)* construct. *(?-i)* performs a
 case-sensitive pattern match but other options can be specified as well. More
 information can be found in the
-pcrepattern(3)|https://www.pcre.org/original/doc/html/pcrepattern.html man page.
+pcre2pattern(3)|https://www.pcre.org/current/doc/html/pcre2pattern.html man page.
 
 === Functions
 
@@ -339,11 +339,11 @@ layer operator (#), followed by a decimal number:
 
     ip.addr#2 == 192.168.30.40
 
-matches only the inner (second) layer in the packet. Layers use simple stacking
-semantics and protocol layers are counted sequentially, so tcp#2 is the layer
-in the stack somewhere above tcp#1.
+matches only the inner (second) layer in the packet.
+Layers use simple stacking semantics and protocol layers are counted sequentially starting from 1.
+For example, in a packet that contains two IPv4 headers, the outer (first) source address can be matched with "ip.src#1" and the inner (second) source address can be matched with "ip.src#2".
 
-For more complicates ranges the same syntax used with slices is valid:
+For more complicated ranges the same syntax used with slices is valid:
 
     tcp.port#[2-4]
 
@@ -456,7 +456,7 @@ Do not confuse this usage of curly brackets with set membership.
 An unfortunate quirk in the filter syntax is that the subtraction operator
 must be preceded by a space character, so "A-B" must be written as "A -B"
 or "A - B".
-                                   
+
 === Protocol field references
 
 A variable using a sigil with the form ${some.proto.field} is called a field
@@ -547,7 +547,7 @@ The *xref:wireshark-filter.html[wireshark-filter](4)* manpage is part of the *Wi
 The latest version of *Wireshark* can be found at
 https://www.wireshark.org.
 
-Regular expressions in the "matches" operator are provided by GRegex in GLib.
+Regular expressions in the "matches" operator are provided by the PCRE2 library.
 See https://www.pcre.org/ for more information.
 
 This manpage does not describe the capture filter syntax, which is

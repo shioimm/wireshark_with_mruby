@@ -24,15 +24,13 @@ public:
      * @param cli_proto_id If valid, add this protocol and bring it to the front.
      * @param filter Display filter to apply.
      */
-    explicit ConversationDialog(QWidget &parent, CaptureFile &cf, int cli_proto_id = -1, const char *filter = NULL);
+    explicit ConversationDialog(QWidget &parent, CaptureFile &cf);
 
 protected:
     void captureFileClosing();
 
 signals:
-    void filterAction(QString filter, FilterAction::Action action, FilterAction::ActionType type);
     void openFollowStreamDialog(follow_type_t type, guint stream_num, guint sub_stream_num);
-    void openTcpStreamGraph(int graph_type);
 
 private:
     QPushButton *follow_bt_;
