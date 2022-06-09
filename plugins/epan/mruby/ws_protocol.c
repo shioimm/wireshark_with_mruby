@@ -339,8 +339,8 @@ static mrb_value mrb_ws_protocol_config(mrb_state *mrb, mrb_value self)
 
 mrb_value mrb_ws_protocol_start(mrb_state *mrb, const char *pathname)
 {
-  FILE *ws_dissector_src = fopen("../plugins/epan/foo/ws_dissector.rb", "r");
-  FILE *ws_protocol_src  = fopen("../plugins/epan/foo/ws_protocol.rb", "r");
+  FILE *ws_dissector_src = fopen("../plugins/epan/mruby/ws_dissector.rb", "r");
+  FILE *ws_protocol_src  = fopen("../plugins/epan/mruby/ws_protocol.rb", "r");
   mrb_load_file(mrb, ws_dissector_src);
   mrb_load_file(mrb, ws_protocol_src);
 

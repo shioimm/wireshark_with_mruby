@@ -3,7 +3,7 @@
 
 #include <mruby.h>
 #include <mruby/compile.h>
-#include "ws_protocol.c"
+#include "../plugins/epan/mruby/ws_protocol.c"
 
 void proto_register_foo(void)
 {
