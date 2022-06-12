@@ -80,8 +80,8 @@ static void ws_protocol_add_items(mrb_state *mrb, mrb_value mrb_items, proto_ite
     mrb_value   mrb_size   = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "size"));
     mrb_value   mrb_offset = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "offset"));
     mrb_value   mrb_endian = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "endian"));
-    mrb_value   mrb_sym    = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "header"));
-    ws_header_t ws_header  = ws_protocol_detect_header(mrb_obj_to_sym(mrb, mrb_sym));
+    mrb_value   mrb_symbol = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "header"));
+    ws_header_t ws_header  = ws_protocol_detect_header(mrb_obj_to_sym(mrb, mrb_symbol));
 
     mrb_value mrb_fmt = mrb_funcall(mrb, mrb_item, "fetch", 2, MRB_SYM(mrb, "format"), mrb_hash_new(mrb));
     mrb_value mrb_fmt_type = mrb_funcall(mrb, mrb_fmt, "fetch", 2, MRB_SYM(mrb, "type"), mrb_nil_value());
@@ -177,6 +177,10 @@ static value_string *ws_protocol_set_packet_labels(mrb_state *mrb,
 
     mrb_plabel_desc      = mrb_funcall(mrb, mrb_plabel_desc, "to_s", 0);
     mrb_plabel_desc_size = mrb_funcall(mrb, mrb_plabel_desc, "size", 0);
+
+    if (mrb_string_p(mrb_plabel_val)) {
+      mrb_plabel_val = mrb_funcall(mrb, mrb_plabel_val, "ord", 0);
+    }
 
     guint32 packet_val  = (guint32)mrb_fixnum(mrb_plabel_val);
     gchar  *packet_desc = malloc(sizeof(gchar) * mrb_fixnum(mrb_plabel_desc_size));
@@ -357,6 +361,7 @@ mrb_value mrb_ws_protocol_start(mrb_state *mrb, const char *pathname)
 
   mrb_const_set(mrb, mrb_pklass, mrb_intern_lit(mrb, "FT_UINT8"),  mrb_fixnum_value(FT_UINT8));
   mrb_const_set(mrb, mrb_pklass, mrb_intern_lit(mrb, "FT_UINT16"), mrb_fixnum_value(FT_UINT16));
+  mrb_const_set(mrb, mrb_pklass, mrb_intern_lit(mrb, "FT_UINT32"), mrb_fixnum_value(FT_UINT32));
   mrb_const_set(mrb, mrb_pklass, mrb_intern_lit(mrb, "FT_IPv4"),   mrb_fixnum_value(FT_IPv4));
   mrb_const_set(mrb, mrb_pklass, mrb_intern_lit(mrb, "BASE_DEC"),  mrb_fixnum_value(BASE_DEC));
   mrb_const_set(mrb, mrb_pklass, mrb_intern_lit(mrb, "BASE_HEX"),  mrb_fixnum_value(BASE_HEX));
