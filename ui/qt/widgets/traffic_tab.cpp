@@ -45,6 +45,7 @@
 #include <QUrl>
 #include <QTemporaryFile>
 #include <QHBoxLayout>
+#include <QRegularExpressionMatch>
 
 TabData::TabData() :
     _name(QString()),
@@ -65,6 +66,72 @@ int TabData::protoId() const
 {
     return _protoId;
 }
+
+
+TrafficDataFilterProxy::TrafficDataFilterProxy(QObject *parent) :
+    QSortFilterProxyModel(parent)
+{}
+
+bool TrafficDataFilterProxy::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
+{
+    ATapDataModel * dataModel = qobject_cast<ATapDataModel *>(sourceModel());
+    if (dataModel) {
+        bool isFiltered = dataModel->data(dataModel->index(source_row, 0), ATapDataModel::ROW_IS_FILTERED).toBool();
+        if (dataModel->filter().length() > 0)
+            return ! isFiltered;
+    }
+
+    return QSortFilterProxyModel::filterAcceptsRow(source_row, source_parent);
+}
+
+bool TrafficDataFilterProxy::lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const
+{
+    if (! source_left.isValid() || ! qobject_cast<const ATapDataModel *>(source_left.model()))
+        return false;
+    if (! source_right.isValid() || ! qobject_cast<const ATapDataModel *>(source_right.model()))
+        return false;
+
+    QVariant datA = source_left.data(ATapDataModel::UNFORMATTED_DISPLAYDATA);
+    QVariant datB = source_right.data(ATapDataModel::UNFORMATTED_DISPLAYDATA);
+
+    QString strA = datA.toString().toLower();
+    QString strB = datB.toString().toLower();
+
+    QRegularExpression re = QRegularExpression(QString("[a-f\\d]{2}:[a-f\\d]{2}:[a-f\\d]{2}:[a-f\\d]{2}:[a-f\\d]{2}:[a-f\\d]{2}"));
+    QRegularExpressionMatch match = re.match(strA);
+    if (match.hasMatch())
+        return strA < strB;
+
+    QRegularExpression reIp("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
+    match = reIp.match(strA);
+    QRegularExpressionMatch matchB = reIp.match(strB);
+    QStringList listA = strA.split('.');
+    QStringList listB = strB.split('.');
+    if (match.hasMatch() && listA.count() == 4 && ! matchB.hasMatch())
+        return true;
+    else if (match.hasMatch() && listA.count() == 4 && matchB.hasMatch() && listB.count() == 4 ) {
+        quint32 ipA = (listA.at(0).toInt() << 24) + (listA.at(1).toInt() << 16) + (listA.at(2).toInt() << 8) + listA.at(3).toInt();
+        quint32 ipB = (listB.at(0).toInt() << 24) + (listB.at(1).toInt() << 16) + (listB.at(2).toInt() << 8) + listB.at(3).toInt();
+        return ipA < ipB;
+    }
+
+    QString iPv6Pattern("(([\\da-f]{1,4}:){7,7}[\\da-f]{1,4}|([\\da-f]{1,4}:){1,7}:|([\\da-f]{1,4}:){1,6}:[\\da-f]{1,4}|"
+        "([\\da-f]{1,4}:){1,5}(:[\\da-f]{1,4}){1,2}|([\\da-f]{1,4}:){1,4}(:[\\da-f]{1,4}){1,3}|([\\da-f]{1,4}:){1,3}(:"
+        "[\\da-f]{1,4}){1,4}|([\\da-f]{1,4}:){1,2}(:[\\da-f]{1,4}){1,5}|[\\da-f]{1,4}:((:[\\da-f]{1,4}){1,6})|:((:[\\da"
+        "-f]{1,4}){1,7}|:)|fe80:(:[\\da-f]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}"
+        "\\d){0,1}\\d)\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}\\d){0,1}\\d)|([\\da-f]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}\\d){0,1}"
+        "\\d)\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}\\d){0,1}\\d))");
+    QRegularExpression reIPv6(iPv6Pattern);
+    match = reIPv6.match(strA);
+    if (match.hasMatch())
+        return strA < strB;
+
+    if (datA.canConvert<double>() && datB.canConvert<double>())
+        return datA.toDouble() < datB.toDouble();
+
+    return QSortFilterProxyModel::lessThan(source_left, source_right);
+}
+
 
 static gboolean iterateProtocols(const void *key, void *value, void *userdata)
 {
@@ -211,7 +278,7 @@ QTreeView * TrafficTab::createTree(int protoId)
             }
         }
 
-        QSortFilterProxyModel * proxyModel = new QSortFilterProxyModel();
+        TrafficDataFilterProxy * proxyModel = new TrafficDataFilterProxy();
         proxyModel->setSourceModel(model);
         tree->setModel(proxyModel);
 
@@ -221,13 +288,13 @@ QTreeView * TrafficTab::createTree(int protoId)
 
         tree->sortByColumn(0, Qt::AscendingOrder);
 
-        connect(proxyModel, &QSortFilterProxyModel::modelReset, this, [tree]() {
+        connect(proxyModel, &TrafficDataFilterProxy::modelReset, this, [tree]() {
             if (tree->model()->rowCount() > 0) {
                 for (int col = 0; col < tree->model()->columnCount(); col++)
                     tree->resizeColumnToContents(col);
             }
         });
-        connect(proxyModel, &QSortFilterProxyModel::modelReset, this, &TrafficTab::modelReset);
+        connect(proxyModel, &TrafficDataFilterProxy::modelReset, this, &TrafficTab::modelReset);
     }
 
     return tree;
@@ -339,7 +406,7 @@ void TrafficTab::doCurrentIndexChange(const QModelIndex & cur, const QModelIndex
     if (! cur.isValid())
         return;
 
-    const QSortFilterProxyModel * proxy = qobject_cast<const QSortFilterProxyModel *>(cur.model());
+    const TrafficDataFilterProxy * proxy = qobject_cast<const TrafficDataFilterProxy *>(cur.model());
     if (! proxy)
         return;
 
@@ -371,10 +438,10 @@ QVariant TrafficTab::currentItemData(int role)
 
 void TrafficTab::modelReset()
 {
-    if (! qobject_cast<QSortFilterProxyModel *>(sender()))
+    if (! qobject_cast<TrafficDataFilterProxy *>(sender()))
         return;
 
-    QSortFilterProxyModel * qsfpm = qobject_cast<QSortFilterProxyModel *>(sender());
+    TrafficDataFilterProxy * qsfpm = qobject_cast<TrafficDataFilterProxy *>(sender());
     if (! qobject_cast<ATapDataModel *>(qsfpm->sourceModel()))
         return;
 
@@ -408,8 +475,8 @@ ATapDataModel * TrafficTab::modelForWidget(QWidget * searchWidget)
 {
     if (qobject_cast<QTreeView *>(searchWidget)) {
         QTreeView * tree = qobject_cast<QTreeView *>(searchWidget);
-        if (qobject_cast<QSortFilterProxyModel *>(tree->model())) {
-            QSortFilterProxyModel * qsfpm = qobject_cast<QSortFilterProxyModel *>(tree->model());
+        if (qobject_cast<TrafficDataFilterProxy *>(tree->model())) {
+            TrafficDataFilterProxy * qsfpm = qobject_cast<TrafficDataFilterProxy *>(tree->model());
             if (qobject_cast<ATapDataModel *>(qsfpm->sourceModel())) {
                 return qobject_cast<ATapDataModel *>(qsfpm->sourceModel());
             }
