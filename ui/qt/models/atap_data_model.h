@@ -47,7 +47,10 @@ public:
         TIMELINE_DATA,
         ENDPOINT_DATATYPE,
         CONVERSATION_ID,
-        ROW_IS_FILTERED
+        ROW_IS_FILTERED,
+        DATA_ADDRESS_TYPE,
+        DATA_IPV4_INTEGER,
+        DATA_IPV6_LIST,
     };
 
     typedef enum {
@@ -228,8 +231,6 @@ protected:
 
 private:
     int _protoId;
-
-    QMap<QString, QVariant> _lookUp;
 
     conv_hash_t hash_;
 };
