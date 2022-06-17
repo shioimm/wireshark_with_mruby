@@ -76,21 +76,18 @@ static void ws_protocol_tree_add(mrb_state *mrb, mrb_value mrb_sym,
 static void ws_protocol_add_items(mrb_state *mrb, mrb_value mrb_items, proto_item *ti, tvbuff_t *tvb)
 {
   for (int i = 0; i < (int)RARRAY_LEN(mrb_items); i++) {
-    mrb_value   mrb_item   = mrb_funcall(mrb, mrb_items, "fetch", 1, mrb_fixnum_value(i));
-    mrb_value   mrb_size   = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "size"));
-    mrb_value   mrb_offset = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "offset"));
-    mrb_value   mrb_endian = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "endian"));
-    mrb_value   mrb_symbol = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "header"));
-    ws_header_t ws_header  = ws_protocol_detect_header(mrb_obj_to_sym(mrb, mrb_symbol));
+    mrb_value mrb_item    = mrb_funcall(mrb, mrb_items, "fetch", 1, mrb_fixnum_value(i));
+    mrb_value mrb_size    = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "size"));
+    mrb_value mrb_offset  = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "offset"));
+    mrb_value mrb_symbol  = mrb_funcall(mrb, mrb_item,  "fetch", 1, MRB_SYM(mrb, "header"));
+    mrb_value mrb_display = mrb_funcall(mrb, mrb_item,  "dig",   1, MRB_SYM(mrb, "display"));
+    mrb_value mrb_endian  = mrb_funcall(mrb, mrb_item,  "dig",   1, MRB_SYM(mrb, "endian"));
 
-    mrb_value mrb_fmt = mrb_funcall(mrb, mrb_item, "fetch", 2, MRB_SYM(mrb, "format"), mrb_hash_new(mrb));
-    mrb_value mrb_fmt_type = mrb_funcall(mrb, mrb_fmt, "fetch", 2, MRB_SYM(mrb, "type"), mrb_nil_value());
+    ws_header_t ws_header = ws_protocol_detect_header(mrb_obj_to_sym(mrb, mrb_symbol));
 
-    if (mrb_nil_p(mrb_fmt_type)) {
-      mrb_fmt_type = MRB_SYM(mrb, "format_add_item");
-    }
+    if (mrb_nil_p(mrb_display)) mrb_display = MRB_SYM(mrb, "format_add_item");
 
-    ws_protocol_tree_add(mrb, mrb_fmt_type,
+    ws_protocol_tree_add(mrb, mrb_display,
                          ti, ws_header.handle, tvb,
                          (int)mrb_fixnum(mrb_offset), (int)mrb_fixnum(mrb_size), (int)mrb_fixnum(mrb_endian));
   }
