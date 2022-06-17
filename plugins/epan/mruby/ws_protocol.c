@@ -60,19 +60,6 @@ static ws_header_t ws_protocol_detect_header(int symbol)
   exit(1);
 }
 
-static void ws_protocol_tree_add(mrb_state *mrb, mrb_value mrb_sym,
-                                 proto_item *ti, int handle, tvbuff_t *tvb,
-                                 int offset, int size, int endian)
-{
-  int format_spec     = (int)mrb_obj_to_sym(mrb, mrb_sym);
-  int add_item_format = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "format_add_item"));
-
-  if (format_spec == add_item_format) {
-    proto_tree_add_item(ti, handle, tvb, offset, size, endian);
-    return;
-  }
-}
-
 static bool ws_protocol_is_default_display(mrb_state *mrb, int format)
 {
   int default_display = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "format_add_item"));
