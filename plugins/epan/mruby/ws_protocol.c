@@ -73,6 +73,20 @@ static void ws_protocol_tree_add(mrb_state *mrb, mrb_value mrb_sym,
   }
 }
 
+static bool ws_protocol_is_default_display(mrb_state *mrb, int format)
+{
+  int default_display = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "format_add_item"));
+
+  return default_display == format;
+}
+
+static bool ws_protocol_is_formatted_int_display(mrb_state *mrb, int format)
+{
+  int formatted_int_display = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "format_add_int_item"));
+
+  return formatted_int_display == format;
+}
+
 static void ws_protocol_add_items(mrb_state *mrb, mrb_value mrb_items, proto_item *ti, tvbuff_t *tvb)
 {
   for (int i = 0; i < (int)RARRAY_LEN(mrb_items); i++) {
@@ -87,9 +101,14 @@ static void ws_protocol_add_items(mrb_state *mrb, mrb_value mrb_items, proto_ite
 
     if (mrb_nil_p(mrb_display)) mrb_display = MRB_SYM(mrb, "format_add_item");
 
-    ws_protocol_tree_add(mrb, mrb_display,
-                         ti, ws_header.handle, tvb,
-                         (int)mrb_fixnum(mrb_offset), (int)mrb_fixnum(mrb_size), (int)mrb_fixnum(mrb_endian));
+    int ws_display_spec = (int)mrb_obj_to_sym(mrb, mrb_display);
+
+    if (ws_protocol_is_default_display(mrb, ws_display_spec)) {
+      proto_tree_add_item(ti, ws_header.handle, tvb,
+                          (int)mrb_fixnum(mrb_offset),
+                          (int)mrb_fixnum(mrb_size),
+                          (int)mrb_fixnum(mrb_endian));
+    }
   }
 }
 
