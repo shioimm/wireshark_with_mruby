@@ -1,6 +1,5 @@
 class WSDissector
-  ENC_BIG_ENDIAN  = nil # Implement in ws_protocol.c
-  FORMAT_ADD_ITEM = :format_add_item
+  ENC_BIG_ENDIAN  = nil # C側で実装
 
   def initialize(name:, depth:)
     @name     = name
