@@ -62,6 +62,10 @@ TrafficTypesModel::TrafficTypesModel(GList ** recentList, QObject *parent) :
 {
     conversation_table_iterate_tables(iterateProtocols, &_allTaps);
 
+    std::sort(_allTaps.begin(), _allTaps.end(), [](TrafficTypesRowData a, TrafficTypesRowData b) {
+        return a.name().compare(b.name(), Qt::CaseInsensitive) < 0;
+    });
+
     QList<int> _protocols;
 
     for (GList * endTab = *_recentList; endTab; endTab = endTab->next) {
@@ -180,6 +184,22 @@ void TrafficTypesModel::selectProtocols(QList<int> protocols)
     endResetModel();
 }
 
+
+TrafficListSortModel::TrafficListSortModel(QObject * parent) :
+    QSortFilterProxyModel(parent)
+{}
+
+bool TrafficListSortModel::lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const
+{
+    if (source_left.isValid() && source_left.column() == TrafficTypesModel::COL_NAME) {
+        QString valA = source_left.data().toString();
+        QString valB = source_right.data().toString();
+        return valA.compare(valB, Qt::CaseInsensitive) <= 0;
+    }
+    return QSortFilterProxyModel::lessThan(source_left, source_right);
+}
+
+
 TrafficTypesList::TrafficTypesList(QWidget *parent) :
     QTreeView(parent)
 {
@@ -194,8 +214,14 @@ void TrafficTypesList::setProtocolInfo(QString name, GList ** recentList)
 {
     _name = name;
 
+    TrafficListSortModel * sortModel = new TrafficListSortModel();
+
     _model = new TrafficTypesModel(recentList);
-    setModel(_model);
+    sortModel->setSourceModel(_model);
+    setModel(sortModel);
+
+    setSortingEnabled(true);
+    sortByColumn(TrafficTypesModel::COL_NAME, Qt::AscendingOrder);
 
     connect(_model, &TrafficTypesModel::protocolsChanged, this, &TrafficTypesList::protocolsChanged);
 
