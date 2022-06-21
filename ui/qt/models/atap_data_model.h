@@ -84,7 +84,7 @@ public:
     int rowCount(const QModelIndex &idx = QModelIndex()) const;
 
     virtual int columnCount(const QModelIndex &parent = QModelIndex()) const = 0;
-    virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const = 0;
+    virtual QVariant headerData(int section, Qt::Orientation orientation = Qt::Horizontal, int role = Qt::DisplayRole) const = 0;
     virtual QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const = 0;
 
     /**
@@ -166,6 +166,14 @@ public:
     bool portsAreHidden() const;
 
     /**
+     * @brief A total column is filled
+     *
+     * @return true if the column is filled
+     * @return false the column is empty
+     */
+    bool showTotalColumn() const;
+
+    /**
      * @brief Enable tapping in this model.
      *
      * This will register the tap listener with the corresponding packet function.
@@ -227,8 +235,6 @@ protected:
 
     register_ct_t* registerTable() const;
 
-    bool showTotalColumn() const;
-
 private:
     int _protoId;
 
@@ -246,6 +252,8 @@ public:
         ENDP_COLUMN_PORT,
         ENDP_COLUMN_PACKETS,
         ENDP_COLUMN_BYTES,
+        ENDP_COLUMN_PACKETS_TOTAL,
+        ENDP_COLUMN_BYTES_TOTAL,
         ENDP_COLUMN_PKT_AB,
         ENDP_COLUMN_BYTES_AB,
         ENDP_COLUMN_PKT_BA,
@@ -261,7 +269,7 @@ public:
     explicit EndpointDataModel(int protoId, QString filter, QObject *parent = nullptr);
 
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant headerData(int section, Qt::Orientation orientation = Qt::Horizontal, int role = Qt::DisplayRole) const;
     QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const;
 
 };
@@ -278,6 +286,8 @@ public:
         CONV_COLUMN_DST_PORT,
         CONV_COLUMN_PACKETS,
         CONV_COLUMN_BYTES,
+        CONV_COLUMN_PACKETS_TOTAL,
+        CONV_COLUMN_BYTES_TOTAL,
         CONV_COLUMN_PKT_AB,
         CONV_COLUMN_BYTES_AB,
         CONV_COLUMN_PKT_BA,
@@ -293,7 +303,7 @@ public:
     explicit ConversationDataModel(int protoId, QString filter, QObject *parent = nullptr);
 
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant headerData(int section, Qt::Orientation orientation = Qt::Horizontal, int role = Qt::DisplayRole) const;
     QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const;
 
     void doDataUpdate();

@@ -22,6 +22,7 @@
 #include <ui/qt/utils/variant_pointer.h>
 #include <ui/qt/widgets/traffic_tab.h>
 #include <ui/qt/widgets/traffic_tree.h>
+#include <ui/qt/widgets/traffic_types_list.h>
 #include <ui/qt/widgets/detachable_tabwidget.h>
 
 #include <QStringList>
@@ -135,15 +136,11 @@ bool TrafficDataFilterProxy::lessThan(const QModelIndex &source_left, const QMod
                 if (source_left.column() == ConversationDataModel::CONV_COLUMN_SRC_ADDR) {
                     portColumn = ConversationDataModel::CONV_COLUMN_SRC_PORT;
                     int col = ConversationDataModel::CONV_COLUMN_DST_ADDR;
-                    if (model->portsAreHidden())
-                        col -= 1;
                     tstA = model->index(source_left.row(), col);
                     tstB = model->index(source_right.row(), col);
                 } else if (source_left.column() == ConversationDataModel::CONV_COLUMN_DST_ADDR) {
                     portColumn = ConversationDataModel::CONV_COLUMN_DST_PORT;
                     int col = ConversationDataModel::CONV_COLUMN_SRC_ADDR;
-                    if (model->portsAreHidden())
-                        col -= 1;
                     tstA = model->index(source_left.row(), col);
                     tstB = model->index(source_right.row(), col);
                 }
@@ -176,6 +173,46 @@ bool TrafficDataFilterProxy::lessThan(const QModelIndex &source_left, const QMod
     return QSortFilterProxyModel::lessThan(source_left, source_right);
 }
 
+bool TrafficDataFilterProxy::filterAcceptsColumn(int source_column, const QModelIndex &) const
+{
+    if (hideColumns_.contains(source_column))
+        return false;
+
+    ATapDataModel * model = qobject_cast<ATapDataModel *>(sourceModel());
+    if (model) {
+        if (model->portsAreHidden()) {
+            if (qobject_cast<EndpointDataModel *>(model) && source_column == EndpointDataModel::ENDP_COLUMN_PORT)
+                return false;
+            if (qobject_cast<ConversationDataModel *>(model) &&
+                (source_column == ConversationDataModel::CONV_COLUMN_SRC_PORT || source_column == ConversationDataModel::CONV_COLUMN_DST_PORT))
+                return false;
+        }
+        if (! model->showTotalColumn()) {
+            if (qobject_cast<EndpointDataModel *>(model) &&
+                (source_column == EndpointDataModel::ENDP_COLUMN_PACKETS_TOTAL || source_column == EndpointDataModel::ENDP_COLUMN_BYTES_TOTAL))
+                return false;
+            if (qobject_cast<ConversationDataModel *>(model) &&
+                (source_column == ConversationDataModel::CONV_COLUMN_PACKETS_TOTAL || source_column == ConversationDataModel::CONV_COLUMN_BYTES_TOTAL))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+void TrafficDataFilterProxy::setColumnVisibility(int column, bool visible)
+{
+    hideColumns_.removeAll(column);
+    if (!visible)
+        hideColumns_.append(column);
+    invalidateFilter();
+}
+
+bool TrafficDataFilterProxy::columnVisible(int column) const
+{
+    return ! hideColumns_.contains(column);
+}
+
 
 TrafficTab::TrafficTab(QWidget * parent) :
     DetachableTabWidget(parent)
@@ -189,14 +226,17 @@ TrafficTab::TrafficTab(QWidget * parent) :
 TrafficTab::~TrafficTab()
 {}
 
-void TrafficTab::setProtocolInfo(QString tableName, QList<int> allProtocols, QList<int> openTabs, ATapModelCallback createModel)
+void TrafficTab::setProtocolInfo(QString tableName, TrafficTypesList * trafficList, GList ** recentColumnList, ATapModelCallback createModel)
 {
     setTabBasename(tableName);
-    _allProtocols = allProtocols;
+
+    _allProtocols = trafficList->protocols();
     if (createModel)
         _createModel = createModel;
 
-    setOpenTabs(openTabs);
+    _recentColumnList = recentColumnList;
+
+    setOpenTabs(trafficList->selectedProtocols());
 }
 
 void TrafficTab::setDelegate(int column, ATapCreateDelegate createDelegate)
@@ -228,7 +268,7 @@ void TrafficTab::setDelegate(int column, ATapCreateDelegate createDelegate)
 
 QTreeView * TrafficTab::createTree(int protoId)
 {
-    TrafficTree * tree = new TrafficTree(tabBasename(), this);
+    TrafficTree * tree = new TrafficTree(tabBasename(), _recentColumnList, this);
 
     if (_createModel) {
         ATapDataModel * model = _createModel(protoId, "");
@@ -253,6 +293,8 @@ QTreeView * TrafficTab::createTree(int protoId)
         tree->setSelectionModel(ism);
         connect(ism, &QItemSelectionModel::currentChanged, this, &TrafficTab::doCurrentIndexChange);
 
+        tree->applyRecentColumns();
+
         tree->sortByColumn(0, Qt::AscendingOrder);
 
         connect(proxyModel, &TrafficDataFilterProxy::modelReset, this, [tree]() {
@@ -262,6 +304,13 @@ QTreeView * TrafficTab::createTree(int protoId)
             }
         });
         connect(proxyModel, &TrafficDataFilterProxy::modelReset, this, &TrafficTab::modelReset);
+
+        /* If the columns for the tree have changed, contact the tab. By also having the tab
+         * columns changed signal connecting back to the tree, it will propagate to all trees
+         * registered with this tab. Attention, this heavily relies on the fact, that all
+         * tree data models are identical */
+        connect(tree, &TrafficTree::columnsHaveChanged, this, &TrafficTab::columnsHaveChanged);
+        connect(this, &TrafficTab::columnsHaveChanged, tree, &TrafficTree::columnsChanged);
     }
 
     return tree;

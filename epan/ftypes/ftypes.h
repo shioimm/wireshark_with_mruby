@@ -77,12 +77,15 @@ enum ftenum {
 	 (ft) == FT_INT16 || \
 	 (ft) == FT_INT24 || \
 	 (ft) == FT_INT32)
+
 #define IS_FT_INT64(ft) \
 	((ft) == FT_INT40 || \
 	 (ft) == FT_INT48 || \
 	 (ft) == FT_INT56 || \
 	 (ft) == FT_INT64)
+
 #define IS_FT_INT(ft) (IS_FT_INT32(ft) || IS_FT_INT64(ft))
+
 #define IS_FT_UINT32(ft) \
 	((ft) == FT_CHAR ||   \
 	 (ft) == FT_UINT8 ||  \
@@ -90,17 +93,21 @@ enum ftenum {
 	 (ft) == FT_UINT24 || \
 	 (ft) == FT_UINT32 || \
 	 (ft) == FT_FRAMENUM)
+
 #define IS_FT_UINT64(ft) \
 	((ft) == FT_UINT40 || \
 	 (ft) == FT_UINT48 || \
 	 (ft) == FT_UINT56 || \
 	 (ft) == FT_UINT64)
+
 #define IS_FT_UINT(ft) (IS_FT_UINT32(ft) || IS_FT_UINT64(ft))
+
 #define IS_FT_TIME(ft) \
 	((ft) == FT_ABSOLUTE_TIME || (ft) == FT_RELATIVE_TIME)
+
 #define IS_FT_STRING(ft) \
 	((ft) == FT_STRING || (ft) == FT_STRINGZ || (ft) == FT_STRINGZPAD || \
-	 (ft) == FT_STRINGZTRUNC)
+	 (ft) == FT_STRINGZTRUNC || (ft) == FT_UINT_STRING)
 
 /* field types lengths */
 #define FT_ETHER_LEN		6
@@ -338,8 +345,24 @@ void
 fvalue_set_floating(fvalue_t *fv, gdouble value);
 
 WS_DLL_PUBLIC
-gpointer
-fvalue_get(fvalue_t *fv);
+const guint8 *
+fvalue_get_bytes(fvalue_t *fv);
+
+WS_DLL_PUBLIC
+const e_guid_t *
+fvalue_get_guid(fvalue_t *fv);
+
+WS_DLL_PUBLIC
+const nstime_t *
+fvalue_get_time(fvalue_t *fv);
+
+WS_DLL_PUBLIC
+const char *
+fvalue_get_string(fvalue_t *fv);
+
+WS_DLL_PUBLIC
+tvbuff_t *
+fvalue_get_protocol(fvalue_t *fv);
 
 WS_DLL_PUBLIC guint32
 fvalue_get_uinteger(fvalue_t *fv);
