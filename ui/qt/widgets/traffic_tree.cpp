@@ -219,11 +219,14 @@ QMenu * TrafficTree::createActionSubMenu(FilterAction::Action cur_action, QModel
     initDirection();
 
     conv_item_t * conv_item = nullptr;
+    bool hasConvId = false;
     if (isConversation)
     {
         ConversationDataModel * model = qobject_cast<ConversationDataModel *>(dataModel());
-        if (model)
+        if (model) {
             conv_item = model->itemForRow(idx.row());
+            hasConvId = model->showConversationId(idx.row());
+        }
     }
 
     QMenu * subMenu = new QMenu(FilterAction::actionName(cur_action));
@@ -231,6 +234,13 @@ QMenu * TrafficTree::createActionSubMenu(FilterAction::Action cur_action, QModel
     foreach (FilterAction::ActionType at, FilterAction::actionTypes()) {
         if (isConversation && conv_item) {
             QMenu *subsubmenu = subMenu->addMenu(FilterAction::actionTypeName(at));
+            if (hasConvId && (cur_action == FilterAction::ActionApply || cur_action == FilterAction::ActionPrepare)) {
+                QString filter = QString("%1.stream eq %2").arg(conv_item->etype == ENDPOINT_TCP ? "tcp" : "udp").arg(conv_item->conv_id);
+                FilterAction * act = new FilterAction(subsubmenu, cur_action, at, tr("Filter on stream id"));
+                act->setProperty("filter", filter);
+                subsubmenu->addAction(act);
+                connect(act, &QAction::triggered, this, &TrafficTree::useFilterAction);
+            }
             foreach (FilterAction::ActionDirection ad, FilterAction::actionDirections()) {
                 FilterAction *fa = new FilterAction(subsubmenu, cur_action, at, ad);
                 QString filter = get_conversation_filter(conv_item, (conv_direction_e) fad_to_cd_[fa->actionDirection()]);
@@ -262,8 +272,8 @@ QMenu * TrafficTree::createCopyMenu(QWidget *parent)
     ca->setToolTip(tr("Copy all values of this page to the clipboard in the YAML data serialization format."));
     ca->setProperty("copy_as", TrafficTree::CLIPBOARD_YAML);
     connect(ca, &QAction::triggered, this, &TrafficTree::clipboardAction);
-    ca = copy_menu->addAction(tr("as Json"));
-    ca->setToolTip(tr("Copy all values of this page to the clipboard in the Json data serialization format."));
+    ca = copy_menu->addAction(tr("as JSON"));
+    ca->setToolTip(tr("Copy all values of this page to the clipboard in the JSON data serialization format."));
     ca->setProperty("copy_as", TrafficTree::CLIPBOARD_JSON);
     connect(ca, &QAction::triggered, this, &TrafficTree::clipboardAction);
 

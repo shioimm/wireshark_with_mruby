@@ -72,6 +72,7 @@
 #define OSS_SLIM_FRAME2_WITH_CRC8           0x06   /*  6 */
 #define OSS_SLIM_FRAME2_WITH_CRC16          0x07   /*  7 */
 #define OSS_MINIMUM_LENGTH                  0x0b   /* 11 */
+#define OSS_BROADCAST_ADDRESS               0x3ff
 
 #define OPENSAFETY_SPDO_CONNECTION_VALID  0x04
 
@@ -1987,19 +1988,20 @@ static hostlist_dissector_info_t  opensafety_dissector_info = {&opensafety_get_f
 
 static tap_packet_status
 opensafety_conversation_packet(void *pct, packet_info *pinfo,
-        epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
+        epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
     address *src = (address *)wmem_alloc0(pinfo->pool, sizeof(address));
     address *dst = (address *)wmem_alloc0(pinfo->pool, sizeof(address));
     conv_hash_t *hash = (conv_hash_t*) pct;
-    opensafety_packet_info * osinfo = (opensafety_packet_info *)vip;
-    guint16 receiver = osinfo->receiver;
+    const opensafety_packet_info *osinfo = (const opensafety_packet_info *)vip;
+    guint16 receiver = GUINT16_FROM_LE(osinfo->receiver);
     if (osinfo->msg_type == OPENSAFETY_SPDO_MESSAGE_TYPE)
-        receiver = 0x3FF;
+        receiver = OSS_BROADCAST_ADDRESS;
+    guint16 sender = GUINT16_FROM_LE(osinfo->sender);
 
     hash->flags = flags;
 
-    alloc_address_wmem(pinfo->pool, src, AT_NUMERIC, (int) sizeof(guint16), &osinfo->sender);
+    alloc_address_wmem(pinfo->pool, src, AT_NUMERIC, (int) sizeof(guint16), &sender);
     alloc_address_wmem(pinfo->pool, dst, AT_NUMERIC, (int) sizeof(guint16), &receiver);
 
     add_conversation_table_data(hash, src, dst, 0, 0, 1, osinfo->msg_len, &pinfo->rel_ts, &pinfo->abs_ts,
@@ -2010,19 +2012,20 @@ opensafety_conversation_packet(void *pct, packet_info *pinfo,
 
 static tap_packet_status
 opensafety_hostlist_packet(void *pit, packet_info *pinfo,
-        epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
+        epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
     address *src = (address *)wmem_alloc0(pinfo->pool, sizeof(address));
     address *dst = (address *)wmem_alloc0(pinfo->pool, sizeof(address));
     conv_hash_t *hash = (conv_hash_t*) pit;
-    opensafety_packet_info * osinfo = (opensafety_packet_info *)vip;
-    guint16 receiver = osinfo->receiver;
+    const opensafety_packet_info *osinfo = (const opensafety_packet_info *)vip;
+    guint16 receiver = GUINT16_FROM_LE(osinfo->receiver);
     if (osinfo->msg_type == OPENSAFETY_SPDO_MESSAGE_TYPE)
-        receiver = 0x3FF;
+        receiver = OSS_BROADCAST_ADDRESS;
+    guint16 sender = GUINT16_FROM_LE(osinfo->sender);
 
     hash->flags = flags;
 
-    alloc_address_wmem(pinfo->pool, src, AT_NUMERIC, (int) sizeof(guint16), &osinfo->sender);
+    alloc_address_wmem(pinfo->pool, src, AT_NUMERIC, (int) sizeof(guint16), &sender);
     alloc_address_wmem(pinfo->pool, dst, AT_NUMERIC, (int) sizeof(guint16), &receiver);
 
     add_hostlist_table_data(hash, src, 0, TRUE,  1, osinfo->msg_len, &opensafety_dissector_info, ENDPOINT_NONE);

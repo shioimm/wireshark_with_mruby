@@ -480,7 +480,7 @@ QVariant EndpointDataModel::data(const QModelIndex &idx, int role) const
         if (idx.column() == EndpointDataModel::ENDP_COLUMN_ADDR) {
             if (role == ATapDataModel::DATA_IPV4_INTEGER && item->myaddress.type == AT_IPv4) {
                 const ws_in4_addr * ip4 = (const ws_in4_addr *) item->myaddress.data;
-                return (quint32) GUINT32_TO_BE(*ip4);
+                return (quint32) GUINT32_FROM_BE(*ip4);
             }
             else if (role == ATapDataModel::DATA_IPV6_LIST && item->myaddress.type == AT_IPv6) {
                 const ws_in6_addr * ip6 = (const ws_in6_addr *) item->myaddress.data;
@@ -548,6 +548,8 @@ QVariant ConversationDataModel::headerData(int section, Qt::Orientation orientat
             return tr("Packets"); break;
         case CONV_COLUMN_BYTES:
             return tr("Bytes"); break;
+        case CONV_COLUMN_CONV_ID:
+            return tr("Stream ID"); break;
         case CONV_COLUMN_PACKETS_TOTAL:
             return tr("Total Packets"); break;
         case CONV_COLUMN_BYTES_TOTAL:
@@ -639,6 +641,8 @@ QVariant ConversationDataModel::data(const QModelIndex &idx, int role) const
         case CONV_COLUMN_BYTES:
             return role == Qt::DisplayRole ? formatString((qlonglong)conv_item->tx_bytes + conv_item->rx_bytes) :
                 QVariant((qlonglong)conv_item->tx_bytes + conv_item->rx_bytes);
+        case CONV_COLUMN_CONV_ID:
+            return (int) conv_item->conv_id;
         case CONV_COLUMN_PACKETS_TOTAL:
         {
             qlonglong packets = 0;
@@ -731,7 +735,7 @@ QVariant ConversationDataModel::data(const QModelIndex &idx, int role) const
             address tst_address = idx.column() == ConversationDataModel::CONV_COLUMN_SRC_ADDR ? conv_item->src_address : conv_item->dst_address;
             if (role == ATapDataModel::DATA_IPV4_INTEGER && tst_address.type == AT_IPv4) {
                 const ws_in4_addr * ip4 = (const ws_in4_addr *) tst_address.data;
-                return (quint32) GUINT32_TO_BE(*ip4);
+                return (quint32) GUINT32_FROM_BE(*ip4);
             }
             else if (role == ATapDataModel::DATA_IPV6_LIST && tst_address.type == AT_IPv6) {
                 const ws_in6_addr * ip6 = (const ws_in6_addr *) tst_address.data;
@@ -751,4 +755,15 @@ conv_item_t * ConversationDataModel::itemForRow(int row)
     if (row < 0 || row >= rowCount())
         return nullptr;
     return (conv_item_t *)&g_array_index(storage_, conv_item_t, row);
+}
+
+bool ConversationDataModel::showConversationId(int row) const
+{
+    if (!storage_ || row >= (int) storage_->len)
+        return false;
+
+    conv_item_t *conv_item = (conv_item_t *)&g_array_index(storage_, conv_item_t, row);
+    if (conv_item && (conv_item->etype == ENDPOINT_TCP || conv_item->etype == ENDPOINT_UDP))
+        return true;
+    return false;
 }

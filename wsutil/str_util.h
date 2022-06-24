@@ -151,21 +151,6 @@ gboolean isprint_utf8_string(const gchar *str, const guint length);
 WS_DLL_PUBLIC
 gboolean isdigit_string(const guchar *str);
 
-/**
- * Return the first occurrence of needle in haystack.
- *
- * @param haystack The data to search
- * @param haystack_len The length of the search data
- * @param needle The string to look for
- * @param needle_len The length of the search string
- * @return A pointer to the first occurrence of "needle" in
- *         "haystack".  If "needle" isn't found or is NULL, or if
- *         "needle_len" is 0, NULL is returned.
- */
-WS_DLL_PUBLIC
-const guint8 *ws_memmem(const void *haystack, size_t haystack_len,
-                        const void *needle, size_t needle_len);
-
 /** Finds the first occurrence of string 'needle' in string 'haystack'.
  *  The matching is done in a case insensitive manner.
  *
@@ -179,6 +164,13 @@ const char *ws_strcasestr(const char *haystack, const char *needle);
 
 WS_DLL_PUBLIC
 char *ws_escape_string(wmem_allocator_t *alloc, const char *string, bool add_quotes);
+
+WS_DLL_PUBLIC
+char *ws_escape_string_len(wmem_allocator_t *alloc, const char *string, ssize_t len, bool add_quotes);
+
+/* Replace null bytes with "\0". */
+WS_DLL_PUBLIC
+char *ws_escape_null(wmem_allocator_t *alloc, const char *string, size_t len, bool add_quotes);
 
 WS_DLL_PUBLIC
 int ws_xton(char ch);

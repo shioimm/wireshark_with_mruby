@@ -28,7 +28,7 @@ wsbuglink:17779[]
 
 * The Conversation and Endpoint dialogs have been redesigned with the following improvements:
  - The context menu now includes the option to resize all columns, as well as copying elements
- - Data may be exported as Json
+ - Data may be exported as JSON
  - Tabs may be detached and reattached from the dialog
  - Adding/Removing tabs will keep them in the same order all the time
  - If a filter is applied, two columns are shown in either dialog detailing the difference between
@@ -41,6 +41,7 @@ wsbuglink:17779[]
    - Selection of tap elements is done via list
    - All configurations and options are done via a left side button row
  - Columns for the Conversations and Endpoint dialogs can be hidden by context menu
+ - TCP/UDP conversations now include the stream id and allows filtering on it
 
 * The PCRE2 library (https://www.pcre.org/) is now a required dependency to build Wireshark.
 
@@ -119,6 +120,7 @@ They previously shipped with Qt 5.12.2.
 ** Support for some additional character escape sequences in double quoted strings has been added.
    Along with octal (\<number>) and hex (\x<number>) encoding, the following C escape sequences are now supported with the same meaning: \a, \b, \f, \n, \r, \t, \v.
    Previously they were only supported with character constants.
+** Unicode universal character names are now supported with the escape sequences \uNNNN or \UNNNNNNNN, where N is an hexadecimal digit.
 ** Unrecognized escape sequences are now treated as a syntax error.
    Previously they were treated as a literal character.
    In addition to the sequences indicated above, backslash, single quotation and double quotation mark are also valid sequences: \\, \', \".
@@ -134,6 +136,9 @@ They previously shipped with Qt 5.12.2.
 ** The display filter engine now uses PCRE2 instead of GRegex (GLib’s bindings to the older and end-of-life PCRE library).
    PCRE2 is compatible with PCRE so any user-visible changes should be minimal.
    Some exotic patterns may now be invalid and require rewriting.
+** Literal strings can handle embedded null bytes (the value '\0') correctly. This includes regular expression patterns.
+   For example the double-quoted string "\0 is a null byte" is a legal literal value.
+   This may be useful to match byte patterns but note that in general protocol fields with a string type still cannot contain embedded null bytes.
 
 * The `text2pcap` command and the “Import from Hex Dump” feature have been updated and enhanced:
 ** `text2pcap` supports writing the output file in all the capture file formats that wiretap library supports, using the same `-F` option as `editcap`, `mergecap`, and `tshark`.

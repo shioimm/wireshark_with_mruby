@@ -161,13 +161,16 @@ bytes_fvalue_get(fvalue_t *fv)
 }
 
 static gboolean
-bytes_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
+bytes_from_string(fvalue_t *fv, const char *s, size_t len, gchar **err_msg _U_)
 {
 	GByteArray	*bytes;
 
 	bytes = g_byte_array_new();
 
-	g_byte_array_append(bytes, (const guint8 *)s, (guint)strlen(s));
+	if (len == 0)
+		len = strlen(s);
+
+	g_byte_array_append(bytes, (const guint8 *)s, (guint)len);
 
 	/* Free up the old value, if we have one */
 	bytes_fvalue_free(fv);
@@ -615,7 +618,7 @@ ftype_register_bytes(void)
 	static ftype_t bytes_type = {
 		FT_BYTES,			/* ftype */
 		"FT_BYTES",			/* name */
-		"Sequence of bytes",		/* pretty_name */
+		"Byte sequence",		/* pretty_name */
 		0,				/* wire_size */
 		bytes_fvalue_new,		/* new_value */
 		bytes_fvalue_copy,		/* copy_value */
@@ -648,7 +651,7 @@ ftype_register_bytes(void)
 	static ftype_t uint_bytes_type = {
 		FT_UINT_BYTES,		/* ftype */
 		"FT_UINT_BYTES",		/* name */
-		"Sequence of bytes",		/* pretty_name */
+		"Byte sequence",		/* pretty_name */
 		0,				/* wire_size */
 		bytes_fvalue_new,		/* new_value */
 		bytes_fvalue_copy,		/* copy_value */
