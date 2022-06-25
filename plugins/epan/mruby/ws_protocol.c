@@ -212,6 +212,33 @@ static value_string *ws_protocol_set_packet_labels(mrb_state *mrb,
   return packet_labels;
 }
 
+static int ws_protocol_field_size(int field_type)
+{
+  int size = 0;
+
+  // WIP: Need to add support other ftypes --
+  switch (field_type) {
+    case FT_INT8:
+    case FT_UINT8:
+      size = 1;
+      break;
+    case FT_INT16:
+    case FT_UINT16:
+      size = 2;
+      break;
+    case FT_INT32:
+    case FT_UINT32:
+    case FT_IPv4:
+      size = 4;
+      break;
+    default:
+      size = 0;
+  }
+  // ----------------------------------------
+
+  return size;
+}
+
 static void ws_protocol_register(mrb_state *mrb, mrb_value self)
 {
   ws_protocol_set_members(mrb, self);
