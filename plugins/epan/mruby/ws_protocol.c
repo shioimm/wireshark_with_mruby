@@ -260,6 +260,7 @@ static void ws_protocol_register(mrb_state *mrb, mrb_value self)
 
     ws_hfs.headers[i].handle = -1;
     ws_hfs.headers[i].symbol = mrb_obj_to_sym(mrb, mrb_hf_symbol);
+    ws_hfs.headers[i].size   = ws_protocol_field_size((int)mrb_fixnum(mrb_hf_type));
 
     char *hf_name   = malloc(sizeof(char) * mrb_fixnum(mrb_funcall(mrb, mrb_hf_name, "size", 0)));
     char *hf_abbrev = malloc(sizeof(char) * mrb_fixnum(mrb_funcall(mrb, mrb_hf_abbrev, "size", 0)));
