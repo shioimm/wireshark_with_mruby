@@ -1,13 +1,13 @@
 class WSProtocol
-  FT_UINT8 = nil # Implement in ws_protocol.c
-  BASE_DEC = nil # Implement in ws_protocol.c
+  FT_UINT8 = nil # Implemented in ws_protocol.c
+  BASE_DEC = nil # Implemented in ws_protocol.c
 
   def self.configure
-    # Implement in ws_protocol.c
+    # Implemented in ws_protocol.c
   end
 
   def initialize
-    # Implement in ws_protocol.c
+    # Implemented in ws_protocol.c
   end
 
   def transport(transport_protocol)
@@ -27,7 +27,7 @@ class WSProtocol
   end
 
   def dissectors(&block)
-    trunk = WSDissector.new(name: @name, depth: 1)
+    trunk = WSDissector.new(name: @name, depth: 1, protocol: self)
     trunk.instance_eval(&block)
     @dissectors = trunk
   end
@@ -37,10 +37,14 @@ class WSProtocol
   end
 
   def register!
-    # Implement in ws_protocol.c
+    # Implemented in ws_protocol.c
   end
 
   def dissect!
-    # Implement in ws_protocol.c
+    # Implemented in ws_protocol.c
+  end
+
+  def packet(offset, type)
+    # Implemented in ws_protocol.c
   end
 end
