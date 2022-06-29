@@ -424,13 +424,6 @@ void cf_redissect_packets(capture_file *cf);
  */
 cf_read_status_t cf_retap_packets(capture_file *cf);
 
-/**
- * Adjust timestamp precision if auto is selected.
- *
- * @param cf the capture file
- */
-void cf_timestamp_auto_precision(capture_file *cf);
-
 /* print_range, enum which frames should be printed */
 typedef enum {
     print_range_selected_only,    /* selected frame(s) only (currently only one) */
@@ -622,9 +615,9 @@ gboolean cf_goto_framenum(capture_file *cf);
  * Select the packet in the given row.
  *
  * @param cf the capture file
- * @param row the row to select
+ * @param frame the frame to be selected
  */
-void cf_select_packet(capture_file *cf, int row);
+void cf_select_packet(capture_file *cf, frame_data *frame);
 
 /**
  * Unselect all packets, if any.

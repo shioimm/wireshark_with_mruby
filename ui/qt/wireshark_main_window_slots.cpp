@@ -2526,10 +2526,7 @@ void WiresharkMainWindow::setTimestampFormat(QAction *action)
 
         if (packet_list_) {
             packet_list_->resetColumns();
-        }
-        if (capture_file_.capFile()) {
-            /* This call adjusts column width */
-            cf_timestamp_auto_precision(capture_file_.capFile());
+            packet_list_->resizeAllColumns(true);
         }
     }
 }
@@ -2541,16 +2538,12 @@ void WiresharkMainWindow::setTimestampPrecision(QAction *action)
     }
     ts_precision tsp = action->data().value<ts_precision>();
     if (recent.gui_time_precision != tsp) {
-        /* the actual precision will be set in packet_list_queue_draw() below */
         timestamp_set_precision(tsp);
         recent.gui_time_precision = tsp;
 
         if (packet_list_) {
             packet_list_->resetColumns();
-        }
-        if (capture_file_.capFile()) {
-            /* This call adjusts column width */
-            cf_timestamp_auto_precision(capture_file_.capFile());
+            packet_list_->resizeAllColumns(true);
         }
     }
 }
@@ -2566,10 +2559,7 @@ void WiresharkMainWindow::on_actionViewTimeDisplaySecondsWithHoursAndMinutes_tri
 
     if (packet_list_) {
         packet_list_->resetColumns();
-    }
-    if (capture_file_.capFile()) {
-        /* This call adjusts column width */
-        cf_timestamp_auto_precision(capture_file_.capFile());
+        packet_list_->resizeAllColumns(true);
     }
 }
 
@@ -2638,8 +2628,7 @@ void WiresharkMainWindow::on_actionViewNormalSize_triggered()
 
 void WiresharkMainWindow::on_actionViewColorizePacketList_triggered(bool checked) {
     recent.packet_list_colorize = checked;
-    packet_list_recolor_packets();
-    packet_list_->resetColorized();
+    packet_list_->recolorPackets();
 }
 
 void WiresharkMainWindow::on_actionViewColoringRules_triggered()

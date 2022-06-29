@@ -84,7 +84,6 @@ static int set_lval_str(df_scanner_state_t *state, int token, const char *token_
 
 static int set_lval_quoted_string(df_scanner_state_t *state, int token, GString *quoted_string);
 static int set_lval_charconst(df_scanner_state_t *state, int token, GString *quoted_string);
-static int set_lval_range_node(df_scanner_state_t *state, int token, const char *token_value);
 static int set_lval_field(df_scanner_state_t *state, int token, const char *token_value);
 
 #define simple(token)	(update_location(yyextra, yytext), set_lval_simple(yyextra, token, yytext, STTYPE_UNINITIALIZED))
@@ -154,6 +153,7 @@ hyphen-bytes	{hex2}(-{hex2})+
 "{"		return simple(TOKEN_LBRACE);
 ".."		return simple(TOKEN_DOTDOT);
 "}"		return simple(TOKEN_RBRACE);
+"$"		return simple(TOKEN_DOLLAR);
 "any"		return simple(TOKEN_ANY);
 "all"		return simple(TOKEN_ALL);
 
@@ -222,7 +222,7 @@ hyphen-bytes	{hex2}(-{hex2})+
 
 <RANGE>[^],]+			{
 	update_location(yyextra, yytext);
-	return set_lval_range_node(yyextra, TOKEN_RANGE_NODE, yytext);
+	return set_lval_simple(yyextra, TOKEN_RANGE_NODE, yytext, STTYPE_UNINITIALIZED);
 }
 
 <RANGE>","			{
@@ -467,12 +467,6 @@ hyphen-bytes	{hex2}(-{hex2})+
 	return set_lval_str(yyextra, TOKEN_UNPARSED, yytext);
 }
 
-"${"{Identifier}"}"		{
-	char *end = strchr(yytext, '}');
-	*end = '\0';
-	return set_lval_field(yyextra, TOKEN_REFERENCE, yytext + 2);
-}
-
 . {
 	/* Default */
 	update_location(yyextra, yytext);
@@ -575,9 +569,6 @@ set_lval_field(df_scanner_state_t *state, int token, const char *token_value)
 		case TOKEN_FIELD:
 			type_id = STTYPE_FIELD;
 			break;
-		case TOKEN_REFERENCE:
-			type_id = STTYPE_REFERENCE;
-			break;
 		default:
 			ws_assert_not_reached();
 	}
@@ -587,23 +578,6 @@ set_lval_field(df_scanner_state_t *state, int token, const char *token_value)
 		dfilter_fail(state->dfw, &state->location, "\"%s\" is not a valid protocol or protocol field.", token_value);
 	}
 	stnode_init(df_lval, type_id, hfinfo, g_strdup(token_value), &state->location);
-	return token;
-}
-
-static int
-set_lval_range_node(df_scanner_state_t *state, int token, const char *token_value)
-{
-	ws_assert(token == TOKEN_RANGE_NODE);
-	char *err = NULL;
-	drange_node *range;
-
-	range = drange_node_from_str(token_value, &err);
-	if (err != NULL) {
-		dfilter_fail(state->dfw, &state->location, "%s", err);
-		g_free(err);
-		return SCAN_FAILED;
-	}
-	stnode_init(df_lval, STTYPE_RANGE_NODE, range, g_strdup(token_value), &state->location);
 	return token;
 }
 

@@ -58,17 +58,9 @@ void packet_list_clear(void);
 void packet_list_freeze(void);
 void packet_list_recreate_visible_rows(void);
 void packet_list_thaw(void);
-void packet_list_next(void);
-void packet_list_prev(void);
 guint packet_list_append(column_info *cinfo, frame_data *fdata);
-frame_data *packet_list_get_row_data(gint row);
-void packet_list_set_selected_row(gint row);
-void packet_list_recolor_packets(void);
 void packet_list_queue_draw(void);
-void packet_list_select_first_row(void);
-void packet_list_moveto_end(void);
 gboolean packet_list_select_row_from_data(frame_data *fdata_needle);
-void packet_list_resize_column(gint col);
 gboolean packet_list_multi_select_active(void);
 
 /* XXX - Yes this isn't the best place, but they are used by file_dlg_win32.c, which is supposed

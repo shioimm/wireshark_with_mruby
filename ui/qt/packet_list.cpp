@@ -98,21 +98,6 @@ const int tail_update_interval_ = 100; // Milliseconds.
 const int overlay_update_interval_ = 100; // 250; // Milliseconds.
 
 
-// Copied from ui/gtk/packet_list.c
-void packet_list_resize_column(gint col)
-{
-    if (!gbl_cur_packet_list) return;
-    gbl_cur_packet_list->resizeColumnToContents(col);
-}
-
-void
-packet_list_select_first_row(void)
-{
-    if (!gbl_cur_packet_list)
-        return;
-    gbl_cur_packet_list->goFirstPacket(false);
-}
-
 /*
  * Given a frame_data structure, scroll to and select the row in the
  * packet list corresponding to that frame.  If there is no such
@@ -130,7 +115,12 @@ packet_list_select_row_from_data(frame_data *fdata_needle)
         return FALSE;
 
     model->flushVisibleRows();
-    int row = model->visibleIndexOf(fdata_needle);
+    int row = -1;
+    if (!fdata_needle)
+        row = 0;
+    else
+        row = model->visibleIndexOf(fdata_needle);
+
     if (row >= 0) {
         /* Calling ClearAndSelect with setCurrentIndex clears the "current"
          * item, but doesn't clear the "selected" item. We want to clear
@@ -155,14 +145,6 @@ packet_list_clear(void)
 }
 
 void
-packet_list_recolor_packets(void)
-{
-    if (gbl_cur_packet_list) {
-        gbl_cur_packet_list->recolorPackets();
-    }
-}
-
-void
 packet_list_freeze(void)
 {
     if (gbl_cur_packet_list) {
@@ -178,23 +160,6 @@ packet_list_thaw(void)
     }
 
     packets_bar_update();
-}
-
-frame_data *
-packet_list_get_row_data(gint row)
-{
-    if (gbl_cur_packet_list) {
-        return gbl_cur_packet_list->getFDataForRow(row);
-    }
-    return NULL;
-}
-
-// Called from cf_continue_tail and cf_finish_tail when auto_scroll_live
-// is enabled.
-void
-packet_list_moveto_end(void)
-{
-    // gbl_cur_packet_list->scrollToBottom();
 }
 
 /* Redraw the packet list *and* currently-selected detail */
@@ -284,7 +249,11 @@ PacketList::PacketList(QWidget *parent) :
     connect(packet_list_model_, SIGNAL(itemHeightChanged(const QModelIndex&)), this, SLOT(updateRowHeights(const QModelIndex&)));
     connect(mainApp, SIGNAL(addressResolutionChanged()), this, SLOT(redrawVisiblePacketsDontSelectCurrent()));
     connect(mainApp, SIGNAL(columnDataChanged()), this, SLOT(redrawVisiblePacketsDontSelectCurrent()));
-    connect(mainApp, &MainApplication::preferencesChanged, this, [=]() { setSortingEnabled(prefs.gui_packet_list_sortable); });
+    connect(mainApp, &MainApplication::preferencesChanged, this, [=]() {
+        if ((bool) (prefs.gui_packet_list_sortable) != isSortingEnabled()) {
+            setSortingEnabled(prefs.gui_packet_list_sortable);
+        }
+    });
 
     connect(header(), SIGNAL(sectionResized(int,int,int)),
             this, SLOT(sectionResized(int,int,int)));
@@ -531,10 +500,12 @@ void PacketList::selectionChanged (const QItemSelection & selected, const QItemS
         }
     }
 
-    if (row < 0)
+    if (row < 0 || !packet_list_model_)
         cf_unselect_packet(cap_file_);
-    else
-        cf_select_packet(cap_file_, row);
+    else {
+        frame_data * fdata = packet_list_model_->getRowFdata(row);
+        cf_select_packet(cap_file_, fdata);
+    }
 
     if (!in_history_ && cap_file_->current_frame) {
         cur_history_++;
@@ -2136,4 +2107,16 @@ void PacketList::rowsInserted(const QModelIndex &parent, int start, int end)
 {
     QTreeView::rowsInserted(parent, start, end);
     rows_inserted_ = true;
+}
+
+void PacketList::resizeAllColumns(bool onlyTimeFormatted)
+{
+    if (!cap_file_ || cap_file_->state == FILE_CLOSED)
+        return;
+
+    for (int col = 0; col < cap_file_->cinfo.num_cols; col++) {
+        if (! onlyTimeFormatted || col_has_time_fmt(&cap_file_->cinfo, col)) {
+            resizeColumnToContents(col);
+        }
+    }
 }

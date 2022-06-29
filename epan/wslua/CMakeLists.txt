@@ -54,7 +54,7 @@ set_source_files_properties(
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
 
-# make-taps.pl depends on the current working directory
+# make-taps.py depends on the current working directory
 # to find the dissector files (contents of taps file
 # depend on this actually, so just changing the paths
 # in these lists won't help).
@@ -71,18 +71,17 @@ set(WSLUA_TAPS_USED
 add_custom_command(
 	OUTPUT
 		${CMAKE_BINARY_DIR}/epan/wslua/taps_wslua.c
+		# XXX taps.txt doesn't appear to be used anywhere.
 		${CMAKE_BINARY_DIR}/epan/wslua/taps.txt
 	COMMAND
-		${PERL_EXECUTABLE}
-		${CMAKE_SOURCE_DIR}/epan/wslua/make-taps.pl
-		${CMAKE_SOURCE_DIR}/epan/wslua/taps
+		${PYTHON_EXECUTABLE}
+		${CMAKE_SOURCE_DIR}/epan/wslua/make-taps.py
 		${CMAKE_BINARY_DIR}/epan/wslua/taps_wslua.c
 		${CMAKE_BINARY_DIR}/epan/wslua/taps.txt
-		${CMAKE_SOURCE_DIR}/epan/wslua
 	DEPENDS
-		${CMAKE_SOURCE_DIR}/epan/wslua/taps
-		${CMAKE_SOURCE_DIR}/epan/wslua/make-taps.pl
-		# Only here to add dependencies for the taps "source"files
+		${CMAKE_SOURCE_DIR}/epan/wslua/taps.ini
+		${CMAKE_SOURCE_DIR}/epan/wslua/make-taps.py
+		# Only here to add dependencies for the taps "source" files
 		${WSLUA_TAPS_USED}
 )
 
@@ -105,13 +104,12 @@ add_custom_command(
 
 add_custom_command(
 	OUTPUT init.lua
-	COMMAND ${PERL_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/make-init-lua.pl
-		${CMAKE_SOURCE_DIR}
+	COMMAND ${PYTHON_EXECUTABLE}
+		${CMAKE_CURRENT_SOURCE_DIR}/make-init-lua.py
 		${CMAKE_CURRENT_SOURCE_DIR}/template-init.lua
-		> init.lua
+		init.lua
 	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/make-init-lua.pl
+		${CMAKE_CURRENT_SOURCE_DIR}/make-init-lua.py
 		${CMAKE_CURRENT_SOURCE_DIR}/template-init.lua
 		${CMAKE_SOURCE_DIR}/epan/ftypes/ftypes.h
 		${CMAKE_SOURCE_DIR}/wiretap/wtap.h

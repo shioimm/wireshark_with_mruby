@@ -198,25 +198,6 @@ cf_callback_remove(cf_callback_t func, gpointer user_data)
     ws_assert_not_reached();
 }
 
-void
-cf_timestamp_auto_precision(capture_file *cf)
-{
-    int i;
-
-    /* don't try to get the file's precision if none is opened */
-    if (cf->state == FILE_CLOSED) {
-        return;
-    }
-
-    /* Set the column widths of those columns that show the time in
-       "command-line-specified" format. */
-    for (i = 0; i < cf->cinfo.num_cols; i++) {
-        if (col_has_time_fmt(&cf->cinfo, i)) {
-            packet_list_resize_column(i);
-        }
-    }
-}
-
 gulong
 cf_get_computed_elapsed(capture_file *cf)
 {
@@ -422,7 +403,6 @@ cf_close(capture_file *cf)
     /* No frames, no frame selected, no field in that frame selected. */
     cf->count = 0;
     cf->current_frame = NULL;
-    cf->current_row = 0;
     cf->finfo_selected = NULL;
 
     /* No frame link-layer types, either. */
@@ -709,7 +689,6 @@ cf_read(capture_file *cf, gboolean reloading)
     cf->lnk_t = wtap_file_encap(cf->provider.wth);
 
     cf->current_frame = frame_data_sequence_find(cf->provider.frames, cf->first_displayed);
-    cf->current_row = 0;
 
     packet_list_thaw();
     if (reloading)
@@ -720,7 +699,7 @@ cf_read(capture_file *cf, gboolean reloading)
     /* If we have any displayed packets to select, select the first of those
        packets by making the first row the selected row. */
     if (cf->first_displayed != 0) {
-        packet_list_select_first_row();
+        packet_list_select_row_from_data(NULL);
     }
 
     /* It is safe again to execute redissections. */
@@ -879,12 +858,7 @@ cf_continue_tail(capture_file *cf, volatile int to_read, wtap_rec *rec,
      * isn't automatically selected.
      */
     if (!cf->current_frame && !packet_list_multi_select_active())
-        packet_list_select_first_row();
-
-    /* moving to the end of the packet list - if the user requested so and
-       we have some new packets. */
-    if (newly_displayed_packets && cf->count != 0)
-        packet_list_moveto_end();
+        packet_list_select_row_from_data(NULL);
 
     if (cf->state == FILE_READ_ABORTED) {
         /* Well, the user decided to exit Wireshark.  Return CF_READ_ABORTED
@@ -2005,9 +1979,8 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
            found the nearest displayed frame to that frame.  Select it, make
            it the focus row, and make it visible. */
         /* Set to invalid to force update of packet list and packet details */
-        cf->current_row = -1;
         if (selected_frame_num == 0) {
-            packet_list_select_first_row();
+            packet_list_select_row_from_data(NULL);
         }else{
             if (!packet_list_select_row_from_data(selected_frame)) {
                 /* We didn't find a row corresponding to this frame.
@@ -4109,14 +4082,11 @@ cf_goto_framenum(capture_file *cf)
 
 /* Select the packet on a given row. */
 void
-cf_select_packet(capture_file *cf, int row)
+cf_select_packet(capture_file *cf, frame_data *fdata)
 {
     epan_dissect_t *old_edt;
-    frame_data     *fdata;
 
-    /* Get the frame data struct pointer for this frame */
-    fdata = packet_list_get_row_data(row);
-
+    /* check the frame data struct pointer for this frame */
     if (fdata == NULL) {
         return;
     }
@@ -4128,7 +4098,6 @@ cf_select_packet(capture_file *cf, int row)
 
     /* Record that this frame is the current frame. */
     cf->current_frame = fdata;
-    cf->current_row = row;
 
     /*
      * The change to defer freeing the current epan_dissect_t was in
@@ -4177,7 +4146,6 @@ cf_unselect_packet(capture_file *cf)
 
     /* No packet is selected. */
     cf->current_frame = NULL;
-    cf->current_row = 0;
 
     /* Destroy the epan_dissect_t for the unselected packet. */
     if (old_edt != NULL)
