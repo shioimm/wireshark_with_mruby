@@ -25,10 +25,6 @@ class WSDissector
     end
   end
 
-  def packet(offset, type, endian = nil)
-    endian ? @protocol.packet(offset, type, endian) : @protocol.packet(offset, type)
-  end
-
   def value_at(offset, type = nil, endian = nil)
     if endian
       @protocol.value_at(offset, type, endian)

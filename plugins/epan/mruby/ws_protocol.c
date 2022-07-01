@@ -380,33 +380,6 @@ static mrb_value mrb_ws_protocol_value(mrb_state *mrb, mrb_value _self)
   return mrb_funcall(mrb, mrb_fixnum_value(packet), "to_s", 1, mrb_fixnum_value(16));
 }
 
-static mrb_value mrb_ws_protocol_packet(mrb_state *mrb, mrb_value _self)
-{
-  if (operation_mode == REGISTERATION) return mrb_nil_value();
-
-  mrb_int offset;
-  mrb_sym type;
-  mrb_int endian;
-  mrb_get_args(mrb, "in|i", &offset, &type, &endian);
-
-  // WIP: Need to add support other packet types --
-  mrb_sym type_gint8  = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "gint8"));
-  mrb_sym type_gint32 = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "gint32"));
-  // ----------------------------------------------
-
-  gint8 packet = 0;
-
-  if (type == type_gint8) {
-    packet = tvb_get_gint8(_ws_tvb, (int)offset);
-  } else if (type == type_gint32) {
-    packet = (gint32)tvb_get_gint32(_ws_tvb, (int)offset, (int)endian);
-  }
-
-  (void) _self; // Avoid -Wunused-parameter
-
-  return mrb_funcall(mrb, mrb_fixnum_value(packet), "to_s", 1, mrb_fixnum_value(16));
-}
-
 static mrb_value mrb_ws_protocol_config(mrb_state *mrb, mrb_value self)
 {
   mrb_value name, block;
@@ -436,7 +409,6 @@ mrb_value mrb_ws_protocol_start(mrb_state *mrb, const char *pathname)
   mrb_define_method(mrb, pklass, "initialize", mrb_ws_protocol_init,      MRB_ARGS_REQ(1));
   mrb_define_method(mrb, pklass, "register!",  mrb_ws_protocol_register,  MRB_ARGS_NONE());
   mrb_define_method(mrb, pklass, "dissect!",   mrb_ws_protocol_dissector, MRB_ARGS_NONE());
-  mrb_define_method(mrb, pklass, "packet",     mrb_ws_protocol_packet,    MRB_ARGS_ARG(2, 1));
   mrb_define_method(mrb, pklass, "value_at",   mrb_ws_protocol_value,     MRB_ARGS_ARG(1, 2));
 
   mrb_define_class_method(mrb, pklass,
