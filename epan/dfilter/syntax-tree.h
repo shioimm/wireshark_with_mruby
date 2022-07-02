@@ -24,7 +24,6 @@ typedef enum {
 	STTYPE_UNINITIALIZED,
 	STTYPE_TEST,
 	STTYPE_LITERAL,
-	STTYPE_UNPARSED,
 	STTYPE_REFERENCE,
 	STTYPE_STRING,
 	STTYPE_CHARCONST,
@@ -37,37 +36,6 @@ typedef enum {
 	STTYPE_ARITHMETIC,
 	STTYPE_NUM_TYPES
 } sttype_id_t;
-
-typedef enum {
-	TEST_OP_UNINITIALIZED,
-	TEST_OP_NOT,
-	TEST_OP_AND,
-	TEST_OP_OR,
-	TEST_OP_ALL_EQ,
-	TEST_OP_ANY_EQ,
-	TEST_OP_ALL_NE,
-	TEST_OP_ANY_NE,
-	TEST_OP_GT,
-	TEST_OP_GE,
-	TEST_OP_LT,
-	TEST_OP_LE,
-	OP_BITWISE_AND,
-	OP_UNARY_MINUS,
-	OP_ADD,
-	OP_SUBTRACT,
-	OP_MULTIPLY,
-	OP_DIVIDE,
-	OP_MODULO,
-	TEST_OP_CONTAINS,
-	TEST_OP_MATCHES,
-	TEST_OP_IN
-} test_op_t;
-
-typedef enum {
-	ST_MATCH_DEF,
-	ST_MATCH_ANY,
-	ST_MATCH_ALL,
-} test_match_t;
 
 typedef gpointer        (*STTypeNewFunc)(gpointer);
 typedef gpointer        (*STTypeDupFunc)(gconstpointer);
@@ -101,6 +69,37 @@ typedef struct {
 	stloc_t		location;
 } stnode_t;
 
+typedef enum {
+	STNODE_OP_UNINITIALIZED,
+	STNODE_OP_NOT,
+	STNODE_OP_AND,
+	STNODE_OP_OR,
+	STNODE_OP_ALL_EQ,
+	STNODE_OP_ANY_EQ,
+	STNODE_OP_ALL_NE,
+	STNODE_OP_ANY_NE,
+	STNODE_OP_GT,
+	STNODE_OP_GE,
+	STNODE_OP_LT,
+	STNODE_OP_LE,
+	STNODE_OP_CONTAINS,
+	STNODE_OP_MATCHES,
+	STNODE_OP_IN,
+	STNODE_OP_BITWISE_AND,
+	STNODE_OP_UNARY_MINUS,
+	STNODE_OP_ADD,
+	STNODE_OP_SUBTRACT,
+	STNODE_OP_MULTIPLY,
+	STNODE_OP_DIVIDE,
+	STNODE_OP_MODULO,
+} stnode_op_t;
+
+typedef enum {
+	STNODE_MATCH_DEF,
+	STNODE_MATCH_ANY,
+	STNODE_MATCH_ALL,
+} stmatch_t;
+
 /* These are the sttype_t registration function prototypes. */
 void sttype_register_field(void);
 void sttype_register_function(void);
@@ -108,7 +107,7 @@ void sttype_register_pointer(void);
 void sttype_register_set(void);
 void sttype_register_slice(void);
 void sttype_register_string(void);
-void sttype_register_test(void);
+void sttype_register_opers(void);
 
 void
 sttype_init(void);
@@ -120,7 +119,7 @@ void
 sttype_register(sttype_t *type);
 
 stnode_t*
-stnode_new(sttype_id_t type_id, gpointer data, char *token, stloc_t *loc);
+stnode_new(sttype_id_t type_id, gpointer data, char *token, const stloc_t *loc);
 
 stnode_t*
 stnode_dup(const stnode_t *org);
@@ -129,7 +128,7 @@ void
 stnode_clear(stnode_t *node);
 
 void
-stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data, char *token, stloc_t *loc);
+stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data, char *token, const stloc_t *loc);
 
 void
 stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data);

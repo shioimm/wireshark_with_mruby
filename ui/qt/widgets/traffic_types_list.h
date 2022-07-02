@@ -87,8 +87,14 @@ class TrafficListSortModel : public QSortFilterProxyModel
 public:
     TrafficListSortModel(QObject * parent = nullptr);
 
+    void setFilter(QString filter = QString());
+
 protected:
-    virtual bool lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const;
+    virtual bool lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const override;
+    virtual bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
+
+private:
+    QString _filter;
 };
 
 
@@ -100,18 +106,20 @@ public:
     TrafficTypesList(QWidget *parent = nullptr);
 
     void setProtocolInfo(QString name, GList ** recentList);
-    QList<int> protocols() const;
-    QList<int> selectedProtocols() const;
+    QList<int> protocols(bool onlySelected = false) const;
 
 public slots:
     void selectProtocols(QList<int> protocols);
+    void filterList(QString);
 
 signals:
     void protocolsChanged(QList<int> protocols);
+    void clearFilterList();
 
 private:
     QString _name;
     TrafficTypesModel * _model;
+    TrafficListSortModel * _sortModel;
 };
 
 #endif // TRAFFIC_TYPES_LIST_H
