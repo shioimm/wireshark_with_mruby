@@ -53,15 +53,37 @@ wsbuglink:17779[]
   Code using the Lua GRegex module will have to be updated to use lrexlib-pcre2 instead.
   In most cases the API should be compatible and the conversion just requires a module name change.
 
+* The tap registration system has been updated and the list of arguments for tap_packet_cb has
+  changed. All taps registered through register_tap_listener have to be updated.
+
+* Speed when using maxminddb has been greatly improved
+
 * The PCRE2 library (https://www.pcre.org/) is now a required dependency to build Wireshark.
 
 * You must now have a compiler with C11 support in order to build Wireshark.
 
-* The tap registration system has been updated and the list of arguments for tap_packet_cb has
-  changed. All taps registered through register_tap_listener have to be updated.
+* The following libraries and tools have had their minimum required version increased:
+  - CMake 3.10 is required on macos/Linux
+  - Qt version 5.12 (has been 5.6.0), although compilation with 5.10 and 5.11 is still possible, but will trigger a warning during configuration
+  - Windows SDK 10.0.18362.0 is required due to issues with C11 support
+  - macOS version 10.10 (has been 10.8) is required, if the Qt version is to be build, at least 10.11 is required, depending on the Qt version used (see below)
+  - glib2 version 2.50.0 (has been 2.38.0) is required
+  - gcrypt version 1.8.0 (has been 1.5.0) is required
+  - c-ares version 1.14.0 (has been 1.5.0)
+  - Python version 3.6.0 (has been 3.4.0)
+  - gnutls version 3.5.8 (has been 3.3.0)
+  - nghttp2 minimum version has been set to 1.11.0 (none previous)
+
+* For building with Qt on macOS, the following versions are required depending on the Qt version to be used:
+  - Qt 5.10 or higher requires macOS version 10.11
+  - Qt 5.12 or higher requires macOS version 10.12
+  - Qt 5.14 or higher requires macOS version 10.13
+  - Qt 6.0 or higher requires macOS version 10.14
+
 
 Many other improvements have been made.
 See the “New and Updated Features” section below for more details.
+
 
 // === Bug Fixes
 
@@ -141,6 +163,8 @@ They previously shipped with Qt 5.12.2.
    For example the double-quoted string "\0 is a null byte" is a legal literal value.
    This may be useful to match byte patterns but note that in general protocol fields with a string type still cannot contain embedded null bytes.
 ** Booleans can be written as True/TRUE or False/FALSE. Previously they could only be written as 1 or 0.
+** It is now possible to test for the existence of a slice.
+** All integer sizes are now compatible. Unless overflow occurs any integer field can be compared with any other.
 
 * The `text2pcap` command and the “Import from Hex Dump” feature have been updated and enhanced:
 ** `text2pcap` supports writing the output file in all the capture file formats that wiretap library supports, using the same `-F` option as `editcap`, `mergecap`, and `tshark`.
@@ -181,6 +205,8 @@ They previously shipped with Qt 5.12.2.
 
 * The Event Tracing for Windows (ETW) file reader now supports displaying IP packets from an event trace logfile or an event trace live session.
 
+* ciscodump now supports IOS, IOS-XE and ASA remote capturing
+
 === Removed Features and Support
 
 * The CMake options starting with DISABLE_something were renamed ENABLE_something for consistency.
@@ -214,6 +240,7 @@ Enhanced Trading Interface 10.0 (ETI)
 FiveCo's Legacy Register Access Protocol (5co-legacy)
 Generic Data Transfer Protocol (GDT)
 Host IP Configuration Protocol (HICP)
+Locamation Interface Module (IDENT, CALIBRATION, SAMPLES - IM1)
 Mesh Connex (MCX)
 Microsoft Cluster Remote Control Protocol (RCP)
 Protected Extensible Authentication Protocol (PEAP)

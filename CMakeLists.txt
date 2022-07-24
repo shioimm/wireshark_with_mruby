@@ -30,20 +30,19 @@ endif()
 
 if(WIN32)
 	set(_project_name Wireshark)
-	set(_log_project_name Logwolf)
+	set(_log_project_name Logray)
 else()
 	set(_project_name wireshark)
-	set(_log_project_name logwolf)
+	set(_log_project_name logray)
 endif()
 
 project(${_project_name} C CXX)
 
-# Updated by tools/make-version.pl
-set(GIT_REVISION 0)
+# Updated by tools/make-version.py
 set(PROJECT_MAJOR_VERSION 3)
 set(PROJECT_MINOR_VERSION 7)
 set(PROJECT_PATCH_VERSION 2)
-set(PROJECT_BUILD_VERSION ${GIT_REVISION})
+set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
 if(DEFINED ENV{WIRESHARK_VERSION_EXTRA})
@@ -1147,9 +1146,9 @@ reset_find_package(GCRYPT GCRYPT_ERROR_LIBRARY)
 find_package(GCRYPT "1.8.0" REQUIRED)
 # C Asynchronous resolver
 reset_find_package(CARES)
-find_package(CARES "1.5.0" REQUIRED)
+find_package(CARES "1.14.0" REQUIRED)
 find_package(LEX REQUIRED)
-find_package(Perl REQUIRED)
+find_package(Perl)
 find_package(PCRE2 REQUIRED)
 
 if(CMAKE_VERSION VERSION_LESS "3.12")
@@ -1182,7 +1181,7 @@ ws_find_package(AIRPCAP ENABLE_AIRPCAP HAVE_AIRPCAP)
 ws_find_package(Systemd BUILD_sdjournal HAVE_SYSTEMD)
 
 # Build one of the Qt GUIs?
-if(BUILD_wireshark OR BUILD_logwolf)
+if(BUILD_wireshark OR BUILD_logray)
 	if(USE_qt6)
 		set(qtver "6")
 		if(DEFINED ENV{WIRESHARK_QT6_PREFIX_PATH})
@@ -1211,10 +1210,12 @@ if(BUILD_wireshark OR BUILD_logwolf)
 		Qt${qtver}Core
 		Qt${qtver}Gui
 		Qt${qtver}LinguistTools
-		# Our code currently does not compile with Qt6Multimedia
-		# Qt${qtver}Multimedia
 		Qt${qtver}PrintSupport
 		Qt${qtver}Widgets
+		Qt${qtver}Concurrent
+	)
+	set(QT_OPTIONAL_PACKAGELIST
+		Qt${qtver}Multimedia
 	)
 	if(USE_qt6)
 		set(CMAKE_CXX_STANDARD 17)
@@ -1226,13 +1227,18 @@ if(BUILD_wireshark OR BUILD_logwolf)
 		endif()
 		list(APPEND QT_PACKAGELIST Qt6Core5Compat)
 	else()
-		list(APPEND QT_PACKAGELIST Qt5Multimedia)
 		if(WIN32)
 			list(APPEND QT_PACKAGELIST Qt5WinExtras)
 		endif()
 	endif()
 	foreach(_qt_package IN LISTS QT_PACKAGELIST)
 		find_package(${_qt_package} REQUIRED ${QT_FIND_PACKAGE_OPTIONS})
+		list(APPEND QT_LIBRARIES ${${_qt_package}_LIBRARIES})
+		list(APPEND QT_INCLUDE_DIRS ${${_qt_package}_INCLUDE_DIRS})
+		list(APPEND QT_COMPILE_DEFINITIONS ${${_qt_package}_COMPILE_DEFINITIONS})
+	endforeach()
+	foreach(_qt_package IN LISTS QT_OPTIONAL_PACKAGELIST)
+		find_package(${_qt_package} ${QT_FIND_PACKAGE_OPTIONS})
 		list(APPEND QT_LIBRARIES ${${_qt_package}_LIBRARIES})
 		list(APPEND QT_INCLUDE_DIRS ${${_qt_package}_INCLUDE_DIRS})
 		list(APPEND QT_COMPILE_DEFINITIONS ${${_qt_package}_COMPILE_DEFINITIONS})
@@ -1309,7 +1315,7 @@ ws_find_package(ILBC ENABLE_ILBC HAVE_ILBC)
 
 ws_find_package(OPUS ENABLE_OPUS HAVE_OPUS)
 
-if (BUILD_logwolf)
+if (BUILD_logray)
 	# libsinsp+libscap, required for falco-bridge
 	ws_find_package(Sinsp ENABLE_SINSP HAVE_SINSP)
 endif()
@@ -1346,7 +1352,7 @@ find_package( Asciidoctor 1.5 )
 find_package(DOXYGEN)
 
 # The SpeexDSP resampler is required iff building wireshark or sharkd.
-if(BUILD_wireshark OR BUILD_logwolf OR BUILD_sharkd)
+if(BUILD_wireshark OR BUILD_logray OR BUILD_sharkd)
 	# We don't provide a binary package for SpeexDSP in our repository.
 	# If using the repository don't bother searching for a system SpeexDSP
 	# installation and just use the bundled resampler code instead.
@@ -1385,8 +1391,11 @@ if(GNUTLS_FOUND)
 endif()
 
 if (QT_FOUND)
-	if (Qt${qtver}Widgets_VERSION VERSION_LESS 5.9)
-		message(FATAL_ERROR "Qt 5.9 or later is required.")
+	if (Qt${qtver}Widgets_VERSION VERSION_LESS 5.10)
+		message(FATAL_ERROR "Qt 5.12 or later is required.")
+	endif()
+	if (Qt${qtver}Widgets_VERSION VERSION_LESS 5.12)
+		message(WARNING "Wireshark can be build with this version of Qt, though 5.12 or higher is recommended.")
 	endif()
 	if(NOT DEFINED MOC_OPTIONS)
 		# Squelch moc verbose "nothing to do" output
@@ -1440,6 +1449,10 @@ if (QT_FOUND)
 		endif()
 	endif()
 
+	# Qt requires MSVC /permissive- option since 6.3 release
+	if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND Qt${qtver}Widgets_VERSION VERSION_GREATER_EQUAL "6.3.0")
+		add_compile_options("/permissive-")
+	endif()
 endif()
 
 if(ENABLE_CHECKHF_CONFLICT)
@@ -1574,6 +1587,24 @@ endif()
 
 set(DATAFILE_DIR ${_datafile_dir} CACHE INTERNAL "Build time data file location.")
 
+if(ENABLE_APPLICATION_BUNDLE)
+	if(CMAKE_CFG_INTDIR STREQUAL ".")
+		set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/Logray.app/Contents/Resources/share/logray")
+	else()
+		# Xcode
+		set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}/Logray.app/Contents/Resources/share/logray")
+	endif()
+	set(LOG_DATAFILE_DIR ${_log_datafile_dir} CACHE INTERNAL "Build time log analysis data file location.")
+# XXX We need to update wsutil/filesystem.c and packaging/nsis/*logray* to match.
+# elseif(NOT CMAKE_CFG_INTDIR STREQUAL ".")
+# 	# Visual Studio, Xcode, etc.
+# 	set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}/share/logray")
+# else()
+# 	# Makefile, Ninja, etc.
+# 	set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/share/logray")
+endif()
+
+
 # wsutil must be added after DATAFILE_DIR is set such that filesystem.c can
 # learn about the directory location.
 add_subdirectory( wsutil )
@@ -1582,8 +1613,8 @@ if(BUILD_wireshark AND QT_FOUND)
 	add_subdirectory( ui/qt )
 endif()
 
-if(BUILD_logwolf AND QT_FOUND)
-	add_subdirectory( ui/logwolf )
+if(BUILD_logray AND QT_FOUND)
+	add_subdirectory( ui/logray )
 endif()
 
 # Location of our plugins. PLUGIN_DIR should allow running
@@ -1615,9 +1646,9 @@ if(ENABLE_PLUGINS)
 		plugins/codecs/l16_mono
 		${CUSTOM_PLUGIN_SRC_DIR}
 	)
-	set(LOGWOLF_PLUGIN_SRC_DIRS)
+	set(LOGRAY_PLUGIN_SRC_DIRS)
 	if(SINSP_FOUND)
-		list(APPEND LOGWOLF_PLUGIN_SRC_DIRS
+		list(APPEND LOGRAY_PLUGIN_SRC_DIRS
 			plugins/epan/falco_bridge
 		)
 	endif()
@@ -1658,7 +1689,7 @@ if(ENABLE_PLUGINS)
 
 else()
 	set(PLUGIN_SRC_DIRS )
-	set(LOGWOLF_PLUGIN_SRC_DIRS )
+	set(LOGRAY_PLUGIN_SRC_DIRS )
 endif()
 
 if(ENABLE_APPLICATION_BUNDLE)
@@ -1669,22 +1700,22 @@ if(ENABLE_APPLICATION_BUNDLE)
 		set(_plugin_dir "${CMAKE_BINARY_DIR}/run/$<CONFIG>/Wireshark.app/Contents/PlugIns/wireshark/${PLUGIN_PATH_ID}")
 	endif()
 	if(CMAKE_CFG_INTDIR STREQUAL ".")
-		set(_logwolf_plugin_dir "${CMAKE_BINARY_DIR}/run/Logwolf.app/Contents/PlugIns/logwolf/${PLUGIN_PATH_ID}")
+		set(_logray_plugin_dir "${CMAKE_BINARY_DIR}/run/Logray.app/Contents/PlugIns/logray/${PLUGIN_PATH_ID}")
 	else()
 		# Xcode
-		set(_logwolf_plugin_dir "${CMAKE_BINARY_DIR}/run/$<CONFIG>/Logwolf.app/Contents/PlugIns/logwolf/${PLUGIN_PATH_ID}")
+		set(_logray_plugin_dir "${CMAKE_BINARY_DIR}/run/$<CONFIG>/Logray.app/Contents/PlugIns/logray/${PLUGIN_PATH_ID}")
 	endif()
 elseif(WIN32 AND NOT CMAKE_CFG_INTDIR STREQUAL ".")
 	set(_plugin_dir "${CMAKE_BINARY_DIR}/run/$<CONFIG>/${PLUGIN_VERSION_DIR}")
-	set(_logwolf_plugin_dir ${_plugin_dir})
+	set(_logray_plugin_dir ${_plugin_dir})
 else()
 	set(_plugin_dir "${DATAFILE_DIR}/${PLUGIN_VERSION_DIR}")
-	set(_logwolf_plugin_dir ${_plugin_dir})
+	set(_logray_plugin_dir ${_plugin_dir})
 endif()
 set (PLUGIN_DIR ${_plugin_dir} CACHE INTERNAL "Build time plugin location.")
-set (LOGWOLF_PLUGIN_DIR ${_logwolf_plugin_dir} CACHE INTERNAL "Build time Logwolf plugin location.")
+set (LOGRAY_PLUGIN_DIR ${_logray_plugin_dir} CACHE INTERNAL "Build time Logray plugin location.")
 
-foreach(_plugin_src_dir ${PLUGIN_SRC_DIRS} ${LOGWOLF_PLUGIN_SRC_DIRS})
+foreach(_plugin_src_dir ${PLUGIN_SRC_DIRS} ${LOGRAY_PLUGIN_SRC_DIRS})
 	add_subdirectory( ${_plugin_src_dir} )
 endforeach()
 
@@ -1697,8 +1728,8 @@ if(VCSVERSION_OVERRIDE)
 else()
 	add_custom_target(vcs_version
 		BYPRODUCTS vcs_version.h
-		COMMAND ${PERL_EXECUTABLE}
-			${CMAKE_SOURCE_DIR}/tools/make-version.pl
+		COMMAND ${PYTHON_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/tools/make-version.py
 			${CMAKE_SOURCE_DIR}
 	)
 	set_target_properties(vcs_version PROPERTIES FOLDER "Auxiliary")
@@ -1738,12 +1769,12 @@ set(CFG_OUT_FILES
 	wireshark.pc
 )
 
-if(BUILD_logwolf)
+if(BUILD_logray)
 	list(APPEND CFG_OUT_FILES
-		packaging/macosx/LogwolfInfo.plist
-		packaging/macosx/logwolf-app.dmgbuild
-		packaging/macosx/logwolf-dsym.dmgbuild
-		resources/logwolf.exe.manifest
+		packaging/macosx/LograyInfo.plist
+		packaging/macosx/logray-app.dmgbuild
+		packaging/macosx/logray-dsym.dmgbuild
+		resources/logray.exe.manifest
 	)
 endif()
 
@@ -1938,6 +1969,7 @@ set(INSTALL_DIRS
 set(INSTALL_FILES
 	docbook/ws.css
 	enterprises.tsv
+	gpl-2.0-standalone.html
 	manuf
 	resources/share/wireshark/cfilters
 	resources/share/wireshark/colorfilters
@@ -1949,6 +1981,13 @@ set(INSTALL_FILES
 	services
 	wka
 )
+
+if (BUILD_logray)
+	set(LOG_INSTALL_FILES
+		resources/share/logray/colorfilters
+		resources/share/logray/dfilter_buttons
+	)
+endif()
 
 if (ASCIIDOCTOR_FOUND)
 	list(APPEND INSTALL_FILES
@@ -1996,7 +2035,7 @@ if(NOT WIN32)
 endif()
 
 if(USE_REPOSITORY)
-	set(_dll_output_dir "${DATAFILE_DIR}")
+	set(_dll_output_dir "$<TARGET_FILE_DIR:wsutil>")
 	add_custom_target(copy_cli_dlls)
 	set_target_properties(copy_cli_dlls PROPERTIES FOLDER "Copy Tasks")
 	add_custom_command(TARGET copy_cli_dlls PRE_BUILD
@@ -2236,6 +2275,23 @@ foreach(_install_file ${INSTALL_FILES})
 	list(APPEND copy_data_files_depends "${_output_file}")
 endforeach()
 
+if (BUILD_logray AND ENABLE_APPLICATION_BUNDLE)
+	foreach(_install_file ${LOG_INSTALL_FILES})
+		get_filename_component(_install_file_src "${_install_file}" ABSOLUTE)
+		get_filename_component(_install_basename "${_install_file}" NAME)
+		set(_output_file "${LOG_DATAFILE_DIR}/${_install_basename}")
+		add_custom_command(OUTPUT "${_output_file}"
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				"${_install_file_src}"
+				"${_output_file}"
+			DEPENDS
+				docs
+				"${_install_file}"
+		)
+		list(APPEND copy_data_files_depends "${_output_file}")
+	endforeach()
+endif()
+
 # Install Lua files in staging directory such that Lua can used when Wireshark
 # is ran from the build directory. For install targets, see
 # epan/wslua/CMakeLists.txt
@@ -2374,7 +2430,8 @@ add_custom_command(
 	WORKING_DIRECTORY ${_protocol_data_dir}
 )
 
-file(GLOB _profiles_src_files RELATIVE "${CMAKE_SOURCE_DIR}" resources/share/wireshark/profiles/*/*)
+set(_profiles_src_dir ${CMAKE_SOURCE_DIR}/resources/share/wireshark)
+file(GLOB _profiles_src_files RELATIVE ${_profiles_src_dir} ${_profiles_src_dir}/profiles/*/*)
 set (_profiles_data_files)
 foreach(_data_file ${_profiles_src_files})
 	list(APPEND _profiles_data_files "${DATAFILE_DIR}/${_data_file}")
@@ -2432,20 +2489,20 @@ if(BUILD_wireshark AND QT_FOUND)
 	set_executable_resources(wireshark "Wireshark" UNIQUE_RC)
 endif()
 
-if(BUILD_logwolf AND QT_FOUND)
-	set(LOGWOLF_SRC
+if(BUILD_logray AND QT_FOUND)
+	set(LOGRAY_SRC
 		file.c
 		fileset.c
 		${PLATFORM_UI_SRC}
 	)
-	set(logwolf_FILES
+	set(logray_FILES
 		$<TARGET_OBJECTS:capture_opts>
-		$<TARGET_OBJECTS:ui_logwolf>
+		$<TARGET_OBJECTS:ui_logray>
 		$<TARGET_OBJECTS:shark_common>
-		${LOGWOLF_SRC}
+		${LOGRAY_SRC}
 		${PLATFORM_UI_RC_FILES}
 	)
-	set_executable_resources(logwolf "Logwolf" UNIQUE_RC)
+	set_executable_resources(logray "Logray" UNIQUE_RC)
 endif()
 
 if(ENABLE_APPLICATION_BUNDLE)
@@ -2619,8 +2676,8 @@ if(BUILD_wireshark AND QT_FOUND)
 	endif(QT_WINDEPLOYQT_EXECUTABLE)
 endif()
 
-if(BUILD_logwolf AND QT_FOUND)
-	set(logwolf_LIBS
+if(BUILD_logray AND QT_FOUND)
+	set(logray_LIBS
 		ui
 		capchild
 		caputils
@@ -2641,12 +2698,12 @@ if(BUILD_logwolf AND QT_FOUND)
 		${MINIZIP_LIBRARIES}
 	)
 
-	add_executable(logwolf WIN32 MACOSX_BUNDLE ${logwolf_FILES} ${EXTRA_BUNDLE_FILES})
+	add_executable(logray WIN32 MACOSX_BUNDLE ${logray_FILES} ${EXTRA_BUNDLE_FILES})
 	if(WIN32 AND NOT BUILD_wireshark)
-		set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT logwolf)
+		set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT logray)
 	endif()
-	set(PROGLIST ${PROGLIST} logwolf)
-	set_target_properties(logwolf PROPERTIES
+	set(PROGLIST ${PROGLIST} logray)
+	set_target_properties(logray PROPERTIES
 		LINK_FLAGS "${WS_LINK_FLAGS}"
 		FOLDER "Executables"
 		INSTALL_RPATH "${EXECUTABLE_INSTALL_RPATH}"
@@ -2655,44 +2712,44 @@ if(BUILD_logwolf AND QT_FOUND)
 		AUTORCC ON
 	)
 	if(MSVC)
-		set_target_properties(logwolf PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+		set_target_properties(logray PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
 	endif()
 	if(ENABLE_APPLICATION_BUNDLE OR WIN32)
-		set_target_properties(logwolf PROPERTIES OUTPUT_NAME Logwolf)
+		set_target_properties(logray PROPERTIES OUTPUT_NAME Logray)
 	endif()
 
 	if(ENABLE_APPLICATION_BUNDLE)
 		if(ASCIIDOCTOR_FOUND)
 			# Make sure to generate files referenced by
 			# BUNDLE_RESOURCE_SHARE_MAN1_FILES
-			add_dependencies(logwolf manpages)
+			add_dependencies(logray manpages)
 		endif()
 		set_target_properties(
-			logwolf PROPERTIES
-				MACOSX_BUNDLE_INFO_PLIST ${CMAKE_BINARY_DIR}/packaging/macosx/LogwolfInfo.plist
+			logray PROPERTIES
+				MACOSX_BUNDLE_INFO_PLIST ${CMAKE_BINARY_DIR}/packaging/macosx/LograyInfo.plist
 		)
 		if(CMAKE_CFG_INTDIR STREQUAL ".")
 			# Add a wrapper script which opens the bundle. This adds
 			# convenience but makes debugging more difficult.
 			# It is not created if using Xcode
-			# XXX Running run/Logwolf.app/Contents/MacOS/Logwolf works
+			# XXX Running run/Logray.app/Contents/MacOS/Logray works
 			# fine for me (Gerald) here on Mojave. Can we just make this a
 			# symlink?
-			file(REMOVE ${CMAKE_BINARY_DIR}/run/logwolf)
-			file(WRITE ${CMAKE_BINARY_DIR}/run/logwolf "#!/bin/sh\n")
-			file(APPEND ${CMAKE_BINARY_DIR}/run/logwolf "# Generated by ${CMAKE_CURRENT_LIST_FILE}\n")
-			file(APPEND ${CMAKE_BINARY_DIR}/run/logwolf "# Wrapper script which should work around the issue described at\n")
-			file(APPEND ${CMAKE_BINARY_DIR}/run/logwolf "# https://stackoverflow.com/questions/25318524/what-exactly-should-i-pass-to-nsapp-activateignoringotherapps-to-get-my-appl\n")
-			file(APPEND ${CMAKE_BINARY_DIR}/run/logwolf "exec ${CMAKE_BINARY_DIR}/run/Logwolf.app/Contents/MacOS/Logwolf \"\$\@\"\n")
-			execute_process(COMMAND chmod a+x ${CMAKE_BINARY_DIR}/run/logwolf)
+			file(REMOVE ${CMAKE_BINARY_DIR}/run/logray)
+			file(WRITE ${CMAKE_BINARY_DIR}/run/logray "#!/bin/sh\n")
+			file(APPEND ${CMAKE_BINARY_DIR}/run/logray "# Generated by ${CMAKE_CURRENT_LIST_FILE}\n")
+			file(APPEND ${CMAKE_BINARY_DIR}/run/logray "# Wrapper script which should work around the issue described at\n")
+			file(APPEND ${CMAKE_BINARY_DIR}/run/logray "# https://stackoverflow.com/questions/25318524/what-exactly-should-i-pass-to-nsapp-activateignoringotherapps-to-get-my-appl\n")
+			file(APPEND ${CMAKE_BINARY_DIR}/run/logray "exec ${CMAKE_BINARY_DIR}/run/Logray.app/Contents/MacOS/Logray \"\$\@\"\n")
+			execute_process(COMMAND chmod a+x ${CMAKE_BINARY_DIR}/run/logray)
 		endif()
 	endif()
 
-	target_link_libraries(logwolf ${logwolf_LIBS})
-	target_include_directories(logwolf SYSTEM PRIVATE ${SPARKLE_INCLUDE_DIRS})
+	target_link_libraries(logray ${logray_LIBS})
+	target_include_directories(logray SYSTEM PRIVATE ${SPARKLE_INCLUDE_DIRS})
 
 	install(
-		TARGETS logwolf
+		TARGETS logray
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 		BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
 	)
@@ -2709,26 +2766,26 @@ if(BUILD_logwolf AND QT_FOUND)
 				--no-compiler-runtime
 				--verbose 0
 				$<$<BOOL:${MSVC}>:--pdb>
-				"$<TARGET_FILE:logwolf>"
+				"$<TARGET_FILE:logray>"
 		)
-		add_dependencies(copy_ls_qt_dlls logwolf)
+		add_dependencies(copy_ls_qt_dlls logray)
 
 		install(CODE "execute_process(COMMAND
 			\"${QT_WINDEPLOYQT_EXECUTABLE}\"
 			--no-compiler-runtime
-			\"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/Logwolf.exe\")"
+			\"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/Logray.exe\")"
 		)
 
 	endif(QT_WINDEPLOYQT_EXECUTABLE)
 endif()
 
-if (BUILD_logwolf AND SINSP_FOUND)
+if (BUILD_logray AND SINSP_FOUND)
 	add_custom_target(copy_falco_plugins)
 	add_custom_command(TARGET copy_falco_plugins
-		COMMAND ${CMAKE_COMMAND} -E make_directory ${LOGWOLF_PLUGIN_DIR}/falco
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SINSP_PLUGINS} ${LOGWOLF_PLUGIN_DIR}/falco
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${LOGRAY_PLUGIN_DIR}/falco
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SINSP_PLUGINS} ${LOGRAY_PLUGIN_DIR}/falco
 	)
-	add_dependencies(logwolf copy_falco_plugins)
+	add_dependencies(logray copy_falco_plugins)
 endif()
 
 # Common properties for CLI executables
@@ -3109,10 +3166,10 @@ if(BUILD_dumpcap AND PCAP_FOUND)
 			endif()"
 		)
 	endif()
-	if(BUILD_logwolf AND ENABLE_APPLICATION_BUNDLE)
+	if(BUILD_logray AND ENABLE_APPLICATION_BUNDLE)
 		add_custom_command(TARGET dumpcap POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				$<TARGET_FILE:dumpcap> run/Logwolf.app/Contents/MacOS/dumpcap
+				$<TARGET_FILE:dumpcap> run/Logray.app/Contents/MacOS/dumpcap
 		)
 	endif()
 elseif(BUILD_dumpcap AND ENABLE_PCAP)
@@ -3362,54 +3419,54 @@ if(ENABLE_APPLICATION_BUNDLE AND BUILD_wireshark)
 
 endif()
 
-if(ENABLE_APPLICATION_BUNDLE AND BUILD_logwolf)
-	add_custom_target(logwolf_app_bundle)
-	set_target_properties(logwolf_app_bundle PROPERTIES FOLDER "Copy Tasks")
-	add_custom_command(TARGET logwolf_app_bundle
+if(ENABLE_APPLICATION_BUNDLE AND BUILD_logray)
+	add_custom_target(logray_app_bundle)
+	set_target_properties(logray_app_bundle PROPERTIES FOLDER "Copy Tasks")
+	add_custom_command(TARGET logray_app_bundle
 		POST_BUILD
-		COMMAND "${CMAKE_BINARY_DIR}/packaging/macosx/osx-app.sh" --bundle Logwolf.app
+		COMMAND "${CMAKE_BINARY_DIR}/packaging/macosx/osx-app.sh" --bundle Logray.app
 		WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/run"
 	)
 
-	add_custom_target(logwolf_dmg_prep DEPENDS logwolf_app_bundle)
+	add_custom_target(logray_dmg_prep DEPENDS logray_app_bundle)
 
-	FILE(MAKE_DIRECTORY packaging/macosx/logwolf)
+	FILE(MAKE_DIRECTORY packaging/macosx/logray)
 
-	set(_logwolf_read_me_first "packaging/macosx/logwolf/Read me first.html")
+	set(_logray_read_me_first "packaging/macosx/logray/Read me first.html")
 	ADD_CUSTOM_COMMAND(
 	OUTPUT
-		${_logwolf_read_me_first}
+		${_logray_read_me_first}
 	COMMAND ${ASCIIDOCTOR_EXECUTABLE}
 		--backend html
-		--out-file ${_logwolf_read_me_first}
+		--out-file ${_logray_read_me_first}
 		--attribute include-dir=${CMAKE_SOURCE_DIR}/docbook
 		--attribute min-macos-version=${MIN_MACOS_VERSION}
-		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logwolf_read_me_first.adoc
+		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logray_read_me_first.adoc
 	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logwolf_read_me_first.adoc
+		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logray_read_me_first.adoc
 	)
 
-	set(_logwolf_dsym_installation "packaging/macosx/logwolf/Debugging symbols installation.html")
+	set(_logray_dsym_installation "packaging/macosx/logray/Debugging symbols installation.html")
 	ADD_CUSTOM_COMMAND(
 	OUTPUT
-		${_logwolf_dsym_installation}
+		${_logray_dsym_installation}
 	COMMAND ${ASCIIDOCTOR_EXECUTABLE}
 		--backend html
-		--out-file ${_logwolf_dsym_installation}
+		--out-file ${_logray_dsym_installation}
 		--attribute include-dir=${CMAKE_SOURCE_DIR}/docbook
-		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logwolf_dsym_installation.adoc
+		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logray_dsym_installation.adoc
 	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logwolf_dsym_installation.adoc
+		${CMAKE_CURRENT_SOURCE_DIR}/packaging/macosx/Logray_dsym_installation.adoc
 	)
 
-	add_custom_target(logwolf_dmg_readmes DEPENDS ${_logwolf_read_me_first} ${_logwolf_dsym_installation} )
-	add_dependencies(logwolf_dmg_prep logwolf_dmg_readmes)
+	add_custom_target(logray_dmg_readmes DEPENDS ${_logray_read_me_first} ${_logray_dsym_installation} )
+	add_dependencies(logray_dmg_prep logray_dmg_readmes)
 
-	ADD_CUSTOM_TARGET( logwolf_dmg
-		COMMAND bash -x ${CMAKE_BINARY_DIR}/packaging/macosx/osx-dmg.sh --app-name Logwolf
+	ADD_CUSTOM_TARGET( logray_dmg
+		COMMAND bash -x ${CMAKE_BINARY_DIR}/packaging/macosx/osx-dmg.sh --app-name Logray
 		# Unlike wireshark_nsis_prep + wireshark_nsis, we can add a direct
 		# dependency here.
-		DEPENDS logwolf_dmg_prep
+		DEPENDS logray_dmg_prep
 		# We create Wireshark.app in "run". Do our work there.
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/run
 	)
@@ -3540,8 +3597,8 @@ if(RPMBUILD_EXECUTABLE)
 	endif()
 
 	execute_process(
-		COMMAND ${PERL_EXECUTABLE}
-			${CMAKE_SOURCE_DIR}/tools/make-version.pl
+		COMMAND ${PYTHON_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/tools/make-version.py
 			${CMAKE_SOURCE_DIR}
 	)
 
@@ -3842,7 +3899,7 @@ set(_test_group_list
 	suite_dfilter.group_integer_1byte
 	suite_dfilter.group_ipv4
 	suite_dfilter.group_membership
-	suite_dfilter.group_range_method
+	suite_dfilter.group_slice
 	suite_dfilter.group_scanner
 	suite_dfilter.group_string_type
 	suite_dfilter.group_stringz

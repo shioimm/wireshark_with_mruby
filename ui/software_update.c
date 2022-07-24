@@ -19,7 +19,7 @@
  * Version 0 of the update URI path has the following elements:
  * - The update path prefix (fixed, "update")
  * - The schema version (fixed, 0)
- * - The application name (variable, "Wireshark" or "Logwolf")
+ * - The application name (variable, "Wireshark" or "Logray")
  * - The application version ("<major>.<minor>.<micro>")
  * - The operating system (variable, one of "Windows" or "macOS")
  * - The architecture name (variable, one of "x86", "x86-64", or "arm64")
@@ -69,7 +69,7 @@ static char *get_appcast_update_url(software_update_channel_e chan) {
     const char *su_application = get_configuration_namespace();
     const char *su_version = VERSION;
 
-    if (g_str_has_prefix(su_application, "Log")) {
+    if (!is_packet_configuration_namespace()) {
         su_version = LOG_VERSION;
     }
 

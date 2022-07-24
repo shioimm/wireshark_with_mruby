@@ -95,7 +95,6 @@ static const value_string etf_tag_vals[] = {
   { FUN_EXT             , "FUN_EXT" },
   { DIST_HEADER         , "DIST_HEADER" },
   { DIST_FRAG_HEADER    , "DIST_FRAG_HEADER" },
-  { DIST_FRAG_CONT      , "DIST_FRAG_CONT" },
   { ATOM_CACHE_REF      , "ATOM_CACHE_REF" },
   { COMPRESSED          , "COMPRESSED" },
   {  0, NULL }
@@ -1145,7 +1144,7 @@ void proto_register_erldp(void) {
     { &hf_erldp_big_ext_str, { "Int", "erldp.big_ext_str",
                         FT_STRING, BASE_NONE, NULL, 0x0,
                         NULL, HFILL}},
-    { &hf_erldp_big_ext_bytes, { "Int", "erldp.big_ext_str",
+    { &hf_erldp_big_ext_bytes, { "Int", "erldp.big_ext_bytes",
                         FT_BYTES, BASE_NONE, NULL, 0x0,
                         NULL, HFILL}},
     { &hf_erldp_float_ext, { "Float", "erldp.float_ext",

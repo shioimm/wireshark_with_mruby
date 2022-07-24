@@ -1385,7 +1385,7 @@ static const value_string bgpext_com_stype_tr_evpn[] = {
     { BGP_EXT_COM_STYPE_EVPN_MMAC,        "MAC Mobility" },
     { BGP_EXT_COM_STYPE_EVPN_LABEL,       "ESI MPLS Label" },
     { BGP_EXT_COM_STYPE_EVPN_IMP,         "ES Import" },
-    { BGP_EXT_COM_STYPE_EVPN_ROUTERMAC,   "EVPN Router MAC" },
+    { BGP_EXT_COM_STYPE_EVPN_ROUTERMAC,   "EVPN Router's MAC" },
     { BGP_EXT_COM_STYPE_EVPN_L2ATTR,      "Layer 2 Attributes" },
     { BGP_EXT_COM_STYPE_EVPN_ETREE,       "E-Tree" },
     { BGP_EXT_COM_STYPE_EVPN_DF,          "DF Election" },
@@ -4381,6 +4381,20 @@ decode_mp_next_hop(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint16 
                         length = decode_mp_next_hop_vpn_ipv6(tvb, next_hop_t, offset, pinfo, strbuf, nhlen);
                     }
                     break;
+                case SAFNUM_FSPEC_RULE:
+                case SAFNUM_FSPEC_VPN_RULE:
+                    length = 0;
+                    /* When advertising Flow Specifications, the Length of the
+                     * Next-Hop Address MUST be set 0. The Network Address of
+                     * the Next-Hop field MUST be ignored.
+                     */
+                    if (nhlen != 0) {
+                        expert_add_info_format(pinfo, ti, &ei_bgp_length_invalid,
+                                               "The length (%d) of Next Hop (FlowSpec) is not zero", nhlen);
+                        break;
+                    }
+                    length++;
+                    break;
                 default:
                     length = 0;
                     expert_add_info_format(pinfo, ti, &ei_bgp_unknown_safi,
@@ -4405,6 +4419,20 @@ decode_mp_next_hop(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint16 
                 case SAFNUM_LAB_VPNUNIMULC: /* Deprecated, but as above */
                     /* VPN-IPv6 address, possibly followed by link-local addr */
                     length = decode_mp_next_hop_vpn_ipv6(tvb, next_hop_t, offset, pinfo, strbuf, nhlen);
+                    break;
+                case SAFNUM_FSPEC_RULE:
+                case SAFNUM_FSPEC_VPN_RULE:
+                    length = 0;
+                    /* When advertising Flow Specifications, the Length of the
+                     * Next-Hop Address MUST be set 0. The Network Address of
+                     * the Next-Hop field MUST be ignored.
+                     */
+                    if (nhlen != 0) {
+                        expert_add_info_format(pinfo, ti, &ei_bgp_length_invalid,
+                                               "The length (%d) of Next Hop (FlowSpec) is not zero", nhlen);
+                        break;
+                    }
+                    length++;
                     break;
                 default:
                     length = 0;
@@ -8142,7 +8170,7 @@ dissect_bgp_update_ext_com(proto_tree *parent_tree, tvbuff_t *tvb, guint16 tlen,
                     case BGP_EXT_COM_STYPE_EVPN_ROUTERMAC:
                         proto_tree_add_item(community_tree, hf_bgp_ext_com_evpn_routermac, tvb, offset+2, 6, ENC_NA);
 
-                        proto_item_append_text(community_item, " Router MAC: %s", tvb_ether_to_str(pinfo->pool, tvb, offset+2));
+                        proto_item_append_text(community_item, " Router's MAC: %s", tvb_ether_to_str(pinfo->pool, tvb, offset+2));
                         break;
 
                     case BGP_EXT_COM_STYPE_EVPN_L2ATTR:
@@ -9011,7 +9039,7 @@ dissect_bgp_path_attr(proto_tree *subtree, tvbuff_t *tvb, guint16 path_attr_len,
                 proto_tree_add_item_ret_uint(subtree2, hf_bgp_update_path_attribute_mp_reach_nlri_address_family, tvb,
                                     o + i + aoff, 2, ENC_BIG_ENDIAN, &af);
                 proto_tree_add_item_ret_uint(subtree2, hf_bgp_update_path_attribute_mp_reach_nlri_safi, tvb,
-                                    o + i + aoff+2, 1, ENC_BIG_ENDIAN, &saf);
+                                    o + i + aoff + 2, 1, ENC_BIG_ENDIAN, &saf);
                 nexthop_len = tvb_get_guint8(tvb, o + i + aoff + 3);
 
                 decode_mp_next_hop(tvb_new_subset_length(tvb, o + i + aoff + 3, nexthop_len + 1), subtree2, pinfo, af, saf, nexthop_len);
@@ -11998,8 +12026,8 @@ proto_register_bgp(void)
         { "ES-Import Route Target", "bgp.ext_com_evpn.esi.rt", FT_ETHER, BASE_NONE,
           NULL, 0x0, "Route Target as a MAC Address", HFILL }},
       { &hf_bgp_ext_com_evpn_routermac,
-        { "Router MAC", "bgp.ext_com_evpn.esi.router_mac", FT_ETHER, BASE_NONE,
-          NULL, 0x0, "Router MAC Address", HFILL }},
+        { "Router's MAC", "bgp.ext_com_evpn.esi.router_mac", FT_ETHER, BASE_NONE,
+          NULL, 0x0, "Router's MAC Address", HFILL }},
       { &hf_bgp_ext_com_evpn_l2attr_flags,
         { "Flags", "bgp.ext_com_evpn.l2attr.flags", FT_UINT16, BASE_HEX,
           NULL, 0x0, "EVPN L2 attribute flags", HFILL }},

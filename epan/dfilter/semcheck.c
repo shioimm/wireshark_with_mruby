@@ -52,26 +52,25 @@ compatible_ftypes(ftenum_t a, ftenum_t b)
 {
 	switch (a) {
 		case FT_NONE:
+		case FT_BOOLEAN:
 		case FT_PROTOCOL:
-		case FT_FLOAT:		/* XXX - should be able to compare with INT */
-		case FT_DOUBLE:		/* XXX - should be able to compare with INT */
 		case FT_ABSOLUTE_TIME:
 		case FT_RELATIVE_TIME:
 		case FT_IEEE_11073_SFLOAT:
 		case FT_IEEE_11073_FLOAT:
 		case FT_IPv4:
 		case FT_IPv6:
-		case FT_IPXNET:
-		case FT_INT40:		/* XXX - should be able to compare with INT */
-		case FT_UINT40:		/* XXX - should be able to compare with INT */
-		case FT_INT48:		/* XXX - should be able to compare with INT */
-		case FT_UINT48:		/* XXX - should be able to compare with INT */
-		case FT_INT56:		/* XXX - should be able to compare with INT */
-		case FT_UINT56:		/* XXX - should be able to compare with INT */
-		case FT_INT64:		/* XXX - should be able to compare with INT */
-		case FT_UINT64:		/* XXX - should be able to compare with INT */
-		case FT_EUI64:		/* XXX - should be able to compare with INT */
 			return a == b;
+
+		case FT_FLOAT:		/* XXX - should be able to compare with INT */
+		case FT_DOUBLE:		/* XXX - should be able to compare with INT */
+			switch (b) {
+				case FT_FLOAT:
+				case FT_DOUBLE:
+					return TRUE;
+				default:
+					return FALSE;
+			}
 
 		case FT_ETHER:
 		case FT_BYTES:
@@ -86,33 +85,33 @@ compatible_ftypes(ftenum_t a, ftenum_t b)
 
 			return (b == FT_ETHER || b == FT_BYTES || b == FT_UINT_BYTES || b == FT_GUID || b == FT_OID || b == FT_AX25 || b == FT_VINES || b == FT_FCWWN || b == FT_REL_OID || b == FT_SYSTEM_ID);
 
-		case FT_BOOLEAN:
-		case FT_FRAMENUM:
-		case FT_CHAR:
 		case FT_UINT8:
 		case FT_UINT16:
 		case FT_UINT24:
 		case FT_UINT32:
+		case FT_CHAR:
+		case FT_FRAMENUM:
+		case FT_IPXNET:
+			return ftype_can_val_to_uinteger(b);
+
+		case FT_UINT40:
+		case FT_UINT48:
+		case FT_UINT56:
+		case FT_UINT64:
+		case FT_EUI64:
+			return ftype_can_val_to_uinteger64(b);
+
 		case FT_INT8:
 		case FT_INT16:
 		case FT_INT24:
 		case FT_INT32:
-			switch (b) {
-				case FT_BOOLEAN:
-				case FT_FRAMENUM:
-				case FT_CHAR:
-				case FT_UINT8:
-				case FT_UINT16:
-				case FT_UINT24:
-				case FT_UINT32:
-				case FT_INT8:
-				case FT_INT16:
-				case FT_INT24:
-				case FT_INT32:
-					return TRUE;
-				default:
-					return FALSE;
-			}
+			return ftype_can_val_to_sinteger(b);
+
+		case FT_INT40:
+		case FT_INT48:
+		case FT_INT56:
+		case FT_INT64:
+			return ftype_can_val_to_sinteger64(b);
 
 		case FT_STRING:
 		case FT_STRINGZ:
@@ -454,7 +453,6 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 
 	switch (stnode_type_id(st_arg1)) {
 		case STTYPE_FIELD:
-		case STTYPE_ARITHMETIC:
 			/* This is OK */
 			break;
 		case STTYPE_REFERENCE:
@@ -463,16 +461,6 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 		case STTYPE_CHARCONST:
 			FAIL(dfw, st_arg1, "%s is neither a field nor a protocol name.",
 					stnode_todisplay(st_arg1));
-			break;
-
-		case STTYPE_SLICE:
-			/*
-			 * XXX - why not?  Shouldn't "eth[3:2]" mean
-			 * "check whether the 'eth' field is present and
-			 * has at least 2 bytes starting at an offset of
-			 * 3"?
-			 */
-			FAIL(dfw, st_arg1, "You cannot test whether a slice is present.");
 			break;
 
 		case STTYPE_FUNCTION:
@@ -487,6 +475,8 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 		case STTYPE_TEST:
 		case STTYPE_FVALUE:
 		case STTYPE_PCRE:
+		case STTYPE_ARITHMETIC:
+		case STTYPE_SLICE:
 			ws_assert_not_reached();
 	}
 }
@@ -1115,7 +1105,7 @@ check_test(dfwork_t *dfw, stnode_t *st_node)
 	}
 }
 
-ftenum_t
+static ftenum_t
 check_arithmetic_entity(dfwork_t *dfw, stnode_t *st_arg, ftenum_t lhs_ftype)
 {
 	sttype_id_t		type;
@@ -1254,6 +1244,9 @@ semcheck(dfwork_t *dfw, stnode_t *st_node)
 			break;
 		case STTYPE_ARITHMETIC:
 			check_arithmetic_expr(dfw, st_node, FT_NONE);
+			break;
+		case STTYPE_SLICE:
+			check_slice_sanity(dfw, st_node, FT_NONE);
 			break;
 		default:
 			check_exists(dfw, st_node);

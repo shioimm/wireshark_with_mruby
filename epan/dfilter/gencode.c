@@ -42,7 +42,6 @@ select_opcode(dfvm_opcode_t op, stmatch_t how)
 		case DFVM_ALL_GE:
 		case DFVM_ALL_LT:
 		case DFVM_ALL_LE:
-		case DFVM_ALL_ZERO:
 		case DFVM_ALL_CONTAINS:
 		case DFVM_ALL_MATCHES:
 		case DFVM_ALL_IN_RANGE:
@@ -53,11 +52,11 @@ select_opcode(dfvm_opcode_t op, stmatch_t how)
 		case DFVM_ANY_GE:
 		case DFVM_ANY_LT:
 		case DFVM_ANY_LE:
-		case DFVM_ANY_ZERO:
 		case DFVM_ANY_CONTAINS:
 		case DFVM_ANY_MATCHES:
 		case DFVM_ANY_IN_RANGE:
 			return how == STNODE_MATCH_ANY ? op : op - 1;
+		case DFVM_NOT_ALL_ZERO:
 		case DFVM_IF_TRUE_GOTO:
 		case DFVM_IF_FALSE_GOTO:
 		case DFVM_CHECK_EXISTS:
@@ -70,6 +69,7 @@ select_opcode(dfvm_opcode_t op, stmatch_t how)
 		case DFVM_READ_REFERENCE_R:
 		case DFVM_PUT_FVALUE:
 		case DFVM_SLICE:
+		case DFVM_LENGTH:
 		case DFVM_BITWISE_AND:
 		case DFVM_UNARY_MINUS:
 		case DFVM_ADD:
@@ -281,6 +281,30 @@ dfw_append_put_fvalue(dfwork_t *dfw, fvalue_t *fv)
 	return reg_val;
 }
 
+/* returns register number that the length's result will be in. */
+static dfvm_value_t *
+dfw_append_length(dfwork_t *dfw, stnode_t *node, GSList **jumps_ptr)
+{
+	GSList *params;
+	dfvm_insn_t	*insn;
+	dfvm_value_t	*reg_val, *val_arg;
+
+	/* Create the new DFVM instruction */
+	insn = dfvm_insn_new(DFVM_LENGTH);
+	/* Create input argument */
+	params = sttype_function_params(node);
+	ws_assert(params);
+	ws_assert(g_slist_length(params) == 1);
+	val_arg = gen_entity(dfw, params->data, jumps_ptr);
+	insn->arg1 = dfvm_value_ref(val_arg);
+	/* Destination. */
+	reg_val = dfvm_value_new_register(dfw->next_register++);
+	insn->arg2 = dfvm_value_ref(reg_val);
+
+	dfw_append_insn(dfw, insn);
+	return reg_val;
+}
+
 /* returns register number that the functions's result will be in. */
 static dfvm_value_t *
 dfw_append_function(dfwork_t *dfw, stnode_t *node, GSList **jumps_ptr)
@@ -291,6 +315,11 @@ dfw_append_function(dfwork_t *dfw, stnode_t *node, GSList **jumps_ptr)
 	dfvm_insn_t	*insn;
 	dfvm_value_t	*reg_val, *val1, *val3, *val_arg;
 	guint		count;
+
+	if (strcmp(sttype_function_name(node), "len") == 0) {
+		/* Replace len() function call with DFVM_LENGTH instruction. */
+		return dfw_append_length(dfw, node, jumps_ptr);
+	}
 
 	/* Create the new DFVM instruction */
 	insn = dfvm_insn_new(DFVM_CALL_FUNCTION);
@@ -591,11 +620,32 @@ gen_notzero(dfwork_t *dfw, stnode_t *st_node)
 	GSList		*jumps = NULL;
 
 	val1 = gen_arithmetic(dfw, st_node, &jumps);
-	insn = dfvm_insn_new(DFVM_ALL_ZERO);
+	insn = dfvm_insn_new(DFVM_NOT_ALL_ZERO);
 	insn->arg1 = dfvm_value_ref(val1);
 	dfw_append_insn(dfw, insn);
-	insn = dfvm_insn_new(DFVM_NOT);
+	g_slist_foreach(jumps, fixup_jumps, dfw);
+	g_slist_free(jumps);
+}
+
+static void
+gen_exists_slice(dfwork_t *dfw, stnode_t *st_node)
+{
+	dfvm_insn_t	*insn;
+	dfvm_value_t	*val1, *reg_val;
+	GSList		*jumps = NULL;
+
+	val1 = gen_entity(dfw, st_node, &jumps);
+	/* Compute length. */
+	insn = dfvm_insn_new(DFVM_LENGTH);
+	insn->arg1 = dfvm_value_ref(val1);
+	reg_val = dfvm_value_new_register(dfw->next_register++);
+	insn->arg2 = dfvm_value_ref(reg_val);
 	dfw_append_insn(dfw, insn);
+	/* Check length is not zero. */
+	insn = dfvm_insn_new(DFVM_NOT_ALL_ZERO);
+	insn->arg1 = dfvm_value_ref(reg_val);
+	dfw_append_insn(dfw, insn);
+	/* Fixup jumps. */
 	g_slist_foreach(jumps, fixup_jumps, dfw);
 	g_slist_free(jumps);
 }
@@ -716,6 +766,9 @@ gencode(dfwork_t *dfw, stnode_t *st_node)
 			break;
 		case STTYPE_ARITHMETIC:
 			gen_notzero(dfw, st_node);
+			break;
+		case STTYPE_SLICE:
+			gen_exists_slice(dfw, st_node);
 			break;
 		default:
 			ws_assert_not_reached();

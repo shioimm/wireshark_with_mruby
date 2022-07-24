@@ -29,6 +29,9 @@
 #include <wsutil/utf8_entities.h>
 #include <inttypes.h>
 
+void proto_register_bpv7(void);
+void proto_reg_handoff_bpv7(void);
+
 /// Protocol column name
 static const char *const proto_name_bp = "BPv7";
 static const char *const proto_name_bp_admin = "BPv7 Admin";
@@ -480,7 +483,7 @@ static ei_register_info expertitems[] = {
 
 /** Delete an arbitrary object allocated under this file scope.
  *
- * @param obj The object to delete.
+ * @param ptr The object to delete.
  */
 static void file_scope_delete(gpointer ptr) {
     wmem_free(wmem_file_scope(), ptr);
