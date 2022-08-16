@@ -32,6 +32,7 @@
 
 #include <epan/wmem_scopes.h>
 
+#include <epan/column-info.h>
 #include <epan/exceptions.h>
 #include <epan/reassemble.h>
 #include <epan/stream.h>
@@ -1215,43 +1216,8 @@ void dissector_add_uint_range(const char *name, range_t *range,
 	}
 }
 
-static void
-dissector_add_preference(const char *name, dissector_handle_t handle, guint init_value)
-{
-	guint* uint_var;
-	module_t *module;
-	gchar *description, *title;
-	dissector_table_t  pref_dissector_table = find_dissector_table(name);
-	int proto_id = proto_get_id(handle->protocol);
-
-	uint_var = wmem_new(wmem_epan_scope(), guint);
-	*uint_var = init_value;
-
-	/* If the dissector already has a preference module, use it */
-	module = prefs_find_module(proto_get_protocol_filter_name(proto_id));
-	if (module == NULL)
-	{
-		/* Otherwise create a new one */
-		module = prefs_register_protocol(proto_id, NULL);
-	}
-
-	description = wmem_strdup_printf(wmem_epan_scope(), "Set the %s for %s (if other than the default of %u)",
-									pref_dissector_table->ui_name, proto_get_protocol_short_name(handle->protocol), *uint_var);
-	title = wmem_strdup_printf(wmem_epan_scope(), "%s %s", proto_get_protocol_short_name(handle->protocol),
-									pref_dissector_table->ui_name);
-
-	prefs_register_decode_as_preference(module, name, title, description, uint_var);
-}
-
-void dissector_add_uint_with_preference(const char *name, const guint32 pattern,
-    dissector_handle_t handle)
-{
-	dissector_add_preference(name, handle, pattern);
-	dissector_add_uint(name, pattern, handle);
-}
-
-void dissector_add_uint_range_with_preference(const char *name, const char* range_str,
-    dissector_handle_t handle)
+static range_t*
+dissector_add_range_preference(const char *name, dissector_handle_t handle, const char* range_str)
 {
 	range_t** range;
 	module_t *module;
@@ -1276,8 +1242,13 @@ void dissector_add_uint_range_with_preference(const char *name, const char* rang
 		routine to apply preferences, which could duplicate the
 		registration of a preference.  Check for that here */
 	if (prefs_find_preference(module, name) == NULL) {
-		description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s)",
+		if (g_strcmp0(range_str, "") > 0) {
+			description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s) (default: %s)",
+									    proto_get_protocol_short_name(handle->protocol), pref_dissector_table->ui_name, range_str);
+		} else {
+			description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s)",
 									    proto_get_protocol_short_name(handle->protocol), pref_dissector_table->ui_name);
+		}
 		title = wmem_strdup_printf(wmem_epan_scope(), "%s(s)", pref_dissector_table->ui_name);
 
 		/* Max value is based on datatype of dissector table */
@@ -1305,7 +1276,27 @@ void dissector_add_uint_range_with_preference(const char *name, const char* rang
 		prefs_register_decode_as_range_preference(module, name, title, description, range, max_value);
 	}
 
-	dissector_add_uint_range(name, *range, handle);
+	return *range;
+}
+
+void dissector_add_uint_with_preference(const char *name, const guint32 pattern,
+    dissector_handle_t handle)
+{
+	char* range_str;
+
+	range_str = wmem_strdup_printf(NULL, "%d", pattern);
+	dissector_add_range_preference(name, handle, range_str);
+	wmem_free(NULL, range_str);
+	dissector_add_uint(name, pattern, handle);
+}
+
+void dissector_add_uint_range_with_preference(const char *name, const char* range_str,
+    dissector_handle_t handle)
+{
+	range_t* range;
+
+	range = dissector_add_range_preference(name, handle, range_str);
+	dissector_add_uint_range(name, range, handle);
 }
 
 /* Delete the entry for a dissector in a uint dissector table
@@ -2242,7 +2233,7 @@ void dissector_add_for_decode_as_with_preference(const char *name,
 	   table value would default to 0.
 	   Set up a preference value with that information
 	 */
-	dissector_add_preference(name, handle, 0);
+	dissector_add_range_preference(name, handle, "");
 
 	dissector_add_for_decode_as(name, handle);
 }

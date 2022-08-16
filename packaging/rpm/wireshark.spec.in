@@ -43,6 +43,13 @@
 # are set.
 %global use_wireshark_group 1
 
+# RPM 4.11.2 and higher errors out on double dash in versions by default.
+# Some, but not all, distros make this a warning instead; ensure that it is.
+# We override the dashes with underscores for the main wireshark RPM version,
+# but rpmbuild will fail based on its generated dependency from the pkg-config
+# file (wireshark.pc), which has our original version with dashes.
+%global _wrong_version_format_terminate_build 0
+
 %global package_version @PROJECT_VERSION@
 
 
@@ -65,7 +72,6 @@ BuildRequires:	clang
 %else
 BuildRequires:	gcc
 %endif
-BuildRequires:	perl
 BuildRequires:	flex
 %if %{with ninja}
 %if 0%{?fedora} || 0%{?rhel}
@@ -74,18 +80,14 @@ BuildRequires:	ninja-build
 BuildRequires:	ninja
 %endif
 %endif
-# XXX We always require Asciidoctor for packaging builds as of 84ab55cf75,
+# We always require Asciidoctor for packaging builds as of 84ab55cf75,
 # unfortunately it's not evenly distributed across distros.
-# Fedora & CentOS 7: rubygem-asciidoctor
-# CentOS 8: <no package? - https://bugzilla.redhat.com/show_bug.cgi?id=1820896>
+# Fedora & CentOS: rubygem-asciidoctor
+# CentOS 8: <added in - https://bugzilla.redhat.com/show_bug.cgi?id=1820896>
 # openSUSE 15.3: ruby2.5-rubygem-asciidoctor
 # SLES 12 SP5: ruby2.1-rubygem-asciidoctor
 # All of the packages provide this, so we can rely on it:
-%if ! 0%{?el8}
 BuildRequires:	/usr/bin/asciidoctor
-%endif
-# No CentOS 8 package, so we install it from rubygems directly, but that
-# means the package manager doesn't know about it and we can't require it.
 
 # For the HTML guides, we need xsltproc, and the docbook stylesheets
 %if %{with guides}
@@ -131,12 +133,6 @@ BuildRequires:	lua51-devel
 BuildRequires:	lua-devel < 5.3
 %endif
 %endif
-%endif
-
-# Fedora complains about double dash in version.
-# Shut it up just for it.
-%if 0%{?fedora}
-%define _wrong_version_format_terminate_build 0
 %endif
 
 %if %{with nghttp2}
@@ -227,6 +223,7 @@ BuildRequires:	libQt5Core-devel
 BuildRequires:	libQt5Gui-devel
 BuildRequires:	libQt5Widgets-devel
 BuildRequires:	libQt5PrintSupport-devel
+BuildRequires:	libQt5Concurrent-devel
 BuildRequires:	libqt5-qtmultimedia-devel
 BuildRequires:	libqt5-linguist-devel
 Requires:	libQt5Svg5

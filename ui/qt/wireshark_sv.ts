@@ -28,8 +28,8 @@
         <translation>Kopiera versionsinformationen till urklipp</translation>
     </message>
     <message>
-        <source>Copy To Clipboard</source>
-        <translation>Kopiera till urklipp</translation>
+        <source>Copy to Clipboard</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Authors</source>
@@ -2236,6 +2236,22 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
     <message>
         <source>Relation</source>
         <translation>Relation</translation>
+    </message>
+    <message>
+        <source>By default order comparisons and contains/matches/in relations are true if any value matches. The quantifier &quot;all&quot; can be used to apply the test to all values in a frame.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Quantifier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Any</source>
+        <translation type="unfinished">Godtycklig</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Allt</translation>
     </message>
     <message>
         <source>Match against this value.</source>

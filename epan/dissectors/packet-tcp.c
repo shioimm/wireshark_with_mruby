@@ -168,7 +168,7 @@ static int hf_tcp_flags = -1;
 static int hf_tcp_flags_res = -1;
 static int hf_tcp_flags_ns = -1;
 static int hf_tcp_flags_cwr = -1;
-static int hf_tcp_flags_ecn = -1;
+static int hf_tcp_flags_ece = -1;
 static int hf_tcp_flags_urg = -1;
 static int hf_tcp_flags_ack = -1;
 static int hf_tcp_flags_push = -1;
@@ -714,7 +714,7 @@ static const unit_name_string units_64bit_version = { " (64bits version)", NULL 
 static char *
 tcp_flags_to_str(wmem_allocator_t *scope, const struct tcpheader *tcph)
 {
-    static const char flags[][4] = { "FIN", "SYN", "RST", "PSH", "ACK", "URG", "ECN", "CWR", "NS" };
+    static const char flags[][4] = { "FIN", "SYN", "RST", "PSH", "ACK", "URG", "ECE", "CWR", "NS" };
     const int maxlength = 64; /* upper bounds, max 53B: 8 * 3 + 2 + strlen("Reserved") + 9 * 2 + 1 */
 
     char *pbuf;
@@ -1008,9 +1008,16 @@ gchar *tcp_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, guint
     conversation_t *conv;
     struct tcp_analysis *tcpd;
 
+    /* XXX: Since TCP doesn't use the endpoint API, we can only look
+     * up using the current pinfo addresses and ports. We don't want
+     * to create a new conversation or new TCP stream.
+     * Eventually the endpoint API should support storing multiple
+     * endpoints and TCP should be changed to use the endpoint API.
+     */
     if (((pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4) ||
         (pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6))
-        && (conv=find_conversation_pinfo(pinfo, 0)) != NULL )
+        && (pinfo->ptype == PT_TCP) &&
+        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, ENDPOINT_TCP, pinfo->srcport, pinfo->destport, 0)) != NULL)
     {
         /* TCP over IPv4/6 */
         tcpd=get_tcp_conversation_data(conv, pinfo);
@@ -7486,7 +7493,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         proto_tree_add_boolean(field_tree, hf_tcp_flags_res, tvb, offset + 12, 1, tcph->th_flags);
         proto_tree_add_boolean(field_tree, hf_tcp_flags_ns, tvb, offset + 12, 1, tcph->th_flags);
         proto_tree_add_boolean(field_tree, hf_tcp_flags_cwr, tvb, offset + 13, 1, tcph->th_flags);
-        proto_tree_add_boolean(field_tree, hf_tcp_flags_ecn, tvb, offset + 13, 1, tcph->th_flags);
+        proto_tree_add_boolean(field_tree, hf_tcp_flags_ece, tvb, offset + 13, 1, tcph->th_flags);
         proto_tree_add_boolean(field_tree, hf_tcp_flags_urg, tvb, offset + 13, 1, tcph->th_flags);
         proto_tree_add_boolean(field_tree, hf_tcp_flags_ack, tvb, offset + 13, 1, tcph->th_flags);
         proto_tree_add_boolean(field_tree, hf_tcp_flags_push, tvb, offset + 13, 1, tcph->th_flags);
@@ -8055,11 +8062,11 @@ proto_register_tcp(void)
             "ECN concealment protection (RFC 3540)", HFILL }},
 
         { &hf_tcp_flags_cwr,
-        { "Congestion Window Reduced (CWR)",            "tcp.flags.cwr", FT_BOOLEAN, 12, TFS(&tfs_set_notset), TH_CWR,
+        { "Congestion Window Reduced",            "tcp.flags.cwr", FT_BOOLEAN, 12, TFS(&tfs_set_notset), TH_CWR,
             NULL, HFILL }},
 
-        { &hf_tcp_flags_ecn,
-        { "ECN-Echo",           "tcp.flags.ecn", FT_BOOLEAN, 12, TFS(&tfs_set_notset), TH_ECN,
+        { &hf_tcp_flags_ece,
+        { "ECN-Echo",           "tcp.flags.ece", FT_BOOLEAN, 12, TFS(&tfs_set_notset), TH_ECE,
             NULL, HFILL }},
 
         { &hf_tcp_flags_urg,

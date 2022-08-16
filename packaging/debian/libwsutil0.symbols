@@ -83,7 +83,6 @@ libwsutil.so.0 libwsutil0 #MINVER#
  free_progdirs@Base 2.3.0
  get_basename@Base 1.12.0~rc1
  get_configuration_namespace@Base 3.7.0
- get_copyright_info@Base 1.99.0
  get_cur_groupname@Base 1.10.0
  get_cur_username@Base 1.10.0
  get_cpu_info@Base 2.3.0
@@ -428,17 +427,16 @@ libwsutil.so.0 libwsutil0 #MINVER#
  ws_optopt@Base 3.5.1
  ws_optpos@Base 3.5.1
  ws_optreset@Base 3.5.1
- ws_pipe_close@Base 2.6.5
  ws_pipe_data_available@Base 2.5.0
  ws_pipe_init@Base 2.5.1
  ws_pipe_spawn_async@Base 2.5.1
  ws_pipe_spawn_sync@Base 2.5.1
- ws_read_string_from_pipe@Base 2.5.0
  ws_regex_compile@Base 3.7.0
  ws_regex_compile_ex@Base 3.7.0
  ws_regex_free@Base 3.7.0
  ws_regex_matches@Base 3.7.0
  ws_regex_matches_length@Base 3.7.0
+ ws_regex_matches_pos@Base 3.7.2
  ws_regex_pattern@Base 3.7.0
  ws_socket_ptoa@Base 3.1.1
  ws_strcasestr@Base 3.7.0

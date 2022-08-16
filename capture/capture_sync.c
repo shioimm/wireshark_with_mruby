@@ -28,6 +28,8 @@
 #include <wsutil/unicode-utils.h>
 #include <wsutil/win32-utils.h>
 #include <wsutil/ws_pipe.h>
+#else
+#include <glib-unix.h>
 #endif
 
 #ifdef HAVE_SYS_WAIT_H
@@ -124,7 +126,9 @@ capture_session_init(capture_session *cap_session, capture_file *cf,
 {
     cap_session->cf                              = cf;
     cap_session->fork_child                      = WS_INVALID_PID;   /* invalid process handle */
+    cap_session->pipe_input_id                   = 0;
 #ifdef _WIN32
+    cap_session->sync_pipe_read_fd               = 0;
     cap_session->signal_pipe_write_fd            = -1;
 #endif
     cap_session->state                           = CAPTURE_STOPPED;
@@ -141,6 +145,53 @@ capture_session_init(capture_session *cap_session, capture_file *cf,
     cap_session->error                           = error;
     cap_session->cfilter_error                   = cfilter_error;
     cap_session->closed                          = closed;
+}
+
+void capture_process_finished(capture_session *cap_session)
+{
+    capture_options *capture_opts = cap_session->capture_opts;
+    interface_options *interface_opts;
+    GString *message;
+    guint i;
+
+    if (!extcap_session_stop(cap_session)) {
+        /* Atleast one extcap process did not fully finish yet, wait for it */
+        return;
+    }
+
+    if (cap_session->fork_child != WS_INVALID_PID) {
+        if (capture_opts->stop_after_extcaps) {
+            /* User has requested capture stop and all extcaps are gone now */
+            capture_opts->stop_after_extcaps = FALSE;
+            sync_pipe_stop(cap_session);
+        }
+        /* Wait for child process to end, session is not closed yet */
+        return;
+    }
+
+    /* Construct message and close session */
+    message = g_string_new(capture_opts->closed_msg);
+    for (i = 0; i < capture_opts->ifaces->len; i++) {
+        interface_opts = &g_array_index(capture_opts->ifaces, interface_options, i);
+        if (interface_opts->if_type != IF_EXTCAP) {
+            continue;
+        }
+
+        if ((interface_opts->extcap_stderr != NULL) &&
+            (interface_opts->extcap_stderr->len > 0)) {
+            if (message->len > 0) {
+                g_string_append(message, "\n");
+            }
+            g_string_append(message, "Error by extcap pipe: ");
+            g_string_append(message, interface_opts->extcap_stderr->str);
+        }
+    }
+
+    cap_session->closed(cap_session, message->str);
+    g_string_free(message, TRUE);
+    g_free(capture_opts->closed_msg);
+    capture_opts->closed_msg = NULL;
+    capture_opts->stop_after_extcaps = FALSE;
 }
 
 /* Append an arg (realloc) to an argc/argv array */
@@ -201,6 +252,67 @@ init_pipe_args(int *argc) {
     return argv;
 }
 
+#ifdef _WIN32
+/* The timer has expired, see if there's stuff to read from the pipe,
+   if so, do the callback */
+static gint
+pipe_timer_cb(gpointer user_data)
+{
+    capture_session *cap_session = (capture_session *)user_data;
+    HANDLE        handle;
+    DWORD         avail        = 0;
+    gboolean      result;
+    DWORD         childstatus;
+    gint          iterations   = 0;
+
+    /* try to read data from the pipe only 5 times, to avoid blocking */
+    while(iterations < 5) {
+        /* Oddly enough although Named pipes don't work on win9x,
+           PeekNamedPipe does !!! */
+        handle = (HANDLE) _get_osfhandle (cap_session->sync_pipe_read_fd);
+        result = PeekNamedPipe(handle, NULL, 0, NULL, &avail, NULL);
+
+        /* Get the child process exit status */
+        GetExitCodeProcess((HANDLE)cap_session->fork_child,
+                           &childstatus);
+
+        /* If the Peek returned an error, or there are bytes to be read
+           or the childwatcher thread has terminated then call the normal
+           callback */
+        if (!result || avail > 0 || childstatus != STILL_ACTIVE) {
+
+            /* And call the real handler */
+            if (!sync_pipe_input_cb(cap_session->sync_pipe_read_fd, user_data)) {
+                ws_debug("input pipe closed, iterations: %u", iterations);
+                /* pipe closed, stop the timer */
+                cap_session->pipe_input_id = 0;
+                return G_SOURCE_REMOVE;
+            }
+        }
+        else {
+            /* No data, stop now */
+            break;
+        }
+
+        iterations++;
+    }
+
+    /* we didn't stop the timer, so let it run */
+    return G_SOURCE_CONTINUE;
+}
+#else
+static gboolean
+pipe_fd_cb(gint fd, GIOCondition condition _U_, gpointer user_data)
+{
+    capture_session *cap_session = (capture_session *)user_data;
+    if (!sync_pipe_input_cb(fd, user_data)) {
+        cap_session->pipe_input_id = 0;
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+}
+#endif
+
 #define ARGV_NUMBER_LEN 24
 /* a new capture run: start a new dumpcap task and hand over parameters through command line */
 gboolean
@@ -238,8 +350,9 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
     capture_opts_log(LOG_DOMAIN_CAPTURE, LOG_LEVEL_DEBUG, capture_opts);
 
     cap_session->fork_child = WS_INVALID_PID;
+    cap_session->capture_opts = capture_opts;
 
-    if (!extcap_init_interfaces(capture_opts)) {
+    if (!extcap_init_interfaces(cap_session)) {
         report_failure("Unable to init extcaps. (tmp fifo already exists?)");
         return FALSE;
     }
@@ -652,7 +765,6 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
     }
 
     cap_session->fork_child_status = 0;
-    cap_session->capture_opts = capture_opts;
     cap_session->cap_data_info = cap_data;
 
     /* we might wait for a moment till child is ready, so update screen now */
@@ -664,9 +776,20 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
        the child process wants to tell us something. */
 
     /* we have a running capture, now wait for the real capture filename */
-    pipe_input_set_handler(sync_pipe_read_fd, (gpointer) cap_session,
-                           &cap_session->fork_child, sync_pipe_input_cb);
-
+    if (cap_session->pipe_input_id) {
+        g_source_remove(cap_session->pipe_input_id);
+        cap_session->pipe_input_id = 0;
+    }
+#ifdef _WIN32
+    /* Tricky to use pipes in win9x, as no concept of wait.  NT can
+       do this but that doesn't cover all win32 platforms. Attempt to do
+       something similar here, start a timer and check for data on every
+       timeout. */
+    cap_session->sync_pipe_read_fd = sync_pipe_read_fd;
+    cap_session->pipe_input_id = g_timeout_add(200, pipe_timer_cb, cap_session);
+#else
+    cap_session->pipe_input_id = g_unix_fd_add(sync_pipe_read_fd, G_IO_IN | G_IO_HUP, pipe_fd_cb, cap_session);
+#endif
     return TRUE;
 }
 
@@ -1686,10 +1809,12 @@ sync_pipe_input_cb(gint source, gpointer user_data)
 #ifdef _WIN32
         ws_close(cap_session->signal_pipe_write_fd);
 #endif
-        ws_debug("cleaning extcap pipe");
-        extcap_if_cleanup(cap_session->capture_opts, &primary_msg);
-        cap_session->closed(cap_session, primary_msg);
-        g_free(primary_msg);
+        cap_session->capture_opts->closed_msg = primary_msg;
+        if (extcap_session_stop(cap_session)) {
+            capture_process_finished(cap_session);
+        } else {
+            extcap_request_stop(cap_session);
+        }
         return FALSE;
     }
 
@@ -2028,11 +2153,6 @@ signal_pipe_capquit_to_child(capture_session *cap_session)
 void
 sync_pipe_stop(capture_session *cap_session)
 {
-#ifdef _WIN32
-    int count;
-    DWORD childstatus;
-    gboolean terminate = TRUE;
-#endif
     if (cap_session->fork_child != WS_INVALID_PID) {
 #ifndef _WIN32
         /* send the SIGINT signal to close the capture child gracefully. */
@@ -2042,24 +2162,18 @@ sync_pipe_stop(capture_session *cap_session)
         }
 #else
 #define STOP_SLEEP_TIME 500 /* ms */
-#define STOP_CHECK_TIME 50
+        DWORD status;
+
         /* First, use the special signal pipe to try to close the capture child
          * gracefully.
          */
         signal_pipe_capquit_to_child(cap_session);
 
         /* Next, wait for the process to exit on its own */
-        for (count = 0; count < STOP_SLEEP_TIME / STOP_CHECK_TIME; count++) {
-            if (GetExitCodeProcess((HANDLE) cap_session->fork_child, &childstatus) &&
-                childstatus != STILL_ACTIVE) {
-                terminate = FALSE;
-                break;
-            }
-            Sleep(STOP_CHECK_TIME);
-        }
+        status = WaitForSingleObject((HANDLE) cap_session->fork_child, STOP_SLEEP_TIME);
 
         /* Force the issue. */
-        if (terminate) {
+        if (status != WAIT_OBJECT_0) {
             ws_warning("sync_pipe_stop: forcing child to exit");
             sync_pipe_kill(cap_session->fork_child);
         }

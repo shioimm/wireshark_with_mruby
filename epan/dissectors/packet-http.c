@@ -282,7 +282,6 @@ static gboolean http_decompress_body = TRUE;
 #define SCTP_DEFAULT_RANGE "80"
 #define TLS_DEFAULT_RANGE "443"
 
-static range_t *global_http_sctp_range = NULL;
 static range_t *global_http_tls_range = NULL;
 
 static range_t *http_tcp_range = NULL;
@@ -332,7 +331,7 @@ static void process_header(tvbuff_t *tvb, int offset, int next_offset,
 			   const guchar *line, int linelen, int colon_offset,
 			   packet_info *pinfo, proto_tree *tree,
 			   headers_t *eh_ptr, http_conv_t *conv_data,
-			   http_type_t http_type);
+			   http_type_t http_type, wmem_map_t *header_value_map);
 static gint find_header_hf_value(tvbuff_t *tvb, int offset, guint header_len);
 static gboolean check_auth_ntlmssp(proto_item *hdr_item, tvbuff_t *tvb,
 				   packet_info *pinfo, gchar *value);
@@ -1022,6 +1021,8 @@ get_http_conversation_data(packet_info *pinfo, conversation_t **conversation)
 	if(!conv_data) {
 		/* Setup the conversation structure itself */
 		conv_data = wmem_new0(wmem_file_scope(), http_conv_t);
+		conv_data->chunk_offsets_fwd = wmem_map_new(wmem_file_scope(), g_int_hash, g_int_equal);
+		conv_data->chunk_offsets_rev = wmem_map_new(wmem_file_scope(), g_int_hash, g_int_equal);
 
 		conversation_add_proto_data(*conversation, proto_http,
 					    conv_data);
@@ -1093,7 +1094,8 @@ static http_info_value_t	*stat_info;
 static int
 dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		     proto_tree *tree, http_conv_t *conv_data,
-		     const char* proto_tag, int proto, gboolean end_of_stream)
+		     const char* proto_tag, int proto, gboolean end_of_stream,
+		     const guint32* const seq)
 {
 	proto_tree	*http_tree = NULL;
 	proto_item	*ti = NULL;
@@ -1125,6 +1127,23 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	guint16 word;
 	gboolean	leading_crlf = FALSE;
 	http_message_info_t message_info;
+	wmem_map_t *header_value_map = wmem_map_new(wmem_packet_scope(), g_str_hash, g_str_equal);
+	int 		chunk_offset = 0;
+	wmem_map_t	*chunk_map = NULL;
+
+	conversation_t  *conversation;
+
+	conversation = find_or_create_conversation(pinfo);
+	if (cmp_address(&pinfo->src, conversation_key_addr1(conversation->key_ptr)) == 0 && pinfo->srcport == conversation_key_port1(conversation->key_ptr)) {
+		chunk_map = conv_data->chunk_offsets_fwd;
+	} else if (cmp_address(&pinfo->dst, conversation_key_addr1(conversation->key_ptr)) == 0 && pinfo->destport == conversation_key_port1(conversation->key_ptr)) {
+		chunk_map = conv_data->chunk_offsets_rev;
+	}
+
+	if (seq && chunk_map) {
+		chunk_offset = GPOINTER_TO_INT(wmem_map_lookup(chunk_map, seq));
+		/* Returns 0 when there is no entry in the map, as we want. */
+	}
 
 	reported_length = tvb_reported_length_remaining(tvb, offset);
 	if (reported_length < 1) {
@@ -1190,7 +1209,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		 * desegmentation if we're told to.
 		 */
 		if (!req_resp_hdrs_do_reassembly(tvb, offset, pinfo,
-		    http_desegment_headers, http_desegment_body, FALSE)) {
+		    http_desegment_headers, http_desegment_body, FALSE, &chunk_offset)) {
 			/*
 			 * More data needed for desegmentation.
 			 */
@@ -1252,10 +1271,13 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			}
 		}
 		if (!req_resp_hdrs_do_reassembly(tvb, offset, pinfo,
-		    http_desegment_headers, try_desegment_body, http_type == HTTP_RESPONSE)) {
+		    http_desegment_headers, try_desegment_body, http_type == HTTP_RESPONSE, &chunk_offset)) {
 			/*
 			 * More data needed for desegmentation.
 			 */
+			if (seq && chunk_map && chunk_offset) {
+				wmem_map_insert(chunk_map, seq, GINT_TO_POINTER(chunk_offset));
+			}
 			return -1;
 		}
 	} else if (have_seen_http) {
@@ -1447,7 +1469,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			 */
 			process_header(tvb, offset, next_offset, line, linelen,
 			    colon_offset, pinfo, http_tree, &headers, conv_data,
-			    http_type);
+			    http_type, header_value_map);
 		}
 		offset = next_offset;
 	}
@@ -1928,6 +1950,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
 		message_info.type = http_type;
 		message_info.media_str = media_str;
+		message_info.data = header_value_map;
 		if (handle != NULL) {
 			/*
 			 * We have a subdissector - call it.
@@ -3029,7 +3052,7 @@ static void
 process_header(tvbuff_t *tvb, int offset, int next_offset,
 	       const guchar *line, int linelen, int colon_offset,
 	       packet_info *pinfo, proto_tree *tree, headers_t *eh_ptr,
-	       http_conv_t *conv_data, http_type_t http_type)
+	       http_conv_t *conv_data, http_type_t http_type, wmem_map_t *header_value_map)
 {
 	int len;
 	int line_end_offset;
@@ -3120,6 +3143,10 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 	value = (char *)wmem_alloc(wmem_packet_scope(), value_len+1);
 	memcpy(value, &line[value_offset - offset], value_len);
 	value[value_len] = '\0';
+
+	if (header_value_map) {
+		wmem_map_insert(header_value_map, header_name, value);
+	}
 
 	if (hf_index == -1) {
 		/*
@@ -3691,7 +3718,7 @@ check_auth_kerberos(proto_item *hdr_item, tvbuff_t *tvb, packet_info *pinfo, con
 
 static void
 dissect_http_on_stream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-    http_conv_t *conv_data, gboolean end_of_stream)
+    http_conv_t *conv_data, gboolean end_of_stream, const guint32 *seq)
 {
 	int		offset = 0;
 	int		len;
@@ -3721,7 +3748,7 @@ dissect_http_on_stream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			}
 			break;
 		}
-		len = dissect_http_message(tvb, offset, pinfo, tree, conv_data, "HTTP", proto_http, end_of_stream);
+		len = dissect_http_message(tvb, offset, pinfo, tree, conv_data, "HTTP", proto_http, end_of_stream, seq);
 		if (len == -1)
 			break;
 		offset += len;
@@ -3776,7 +3803,8 @@ dissect_http_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 
 	/* XXX - how to detect end-of-stream without tcpinfo */
 	end_of_stream = (tcpinfo && IS_TH_FIN(tcpinfo->flags));
-	dissect_http_on_stream(tvb, pinfo, tree, conv_data, end_of_stream);
+	dissect_http_on_stream(tvb, pinfo, tree, conv_data, end_of_stream, tcpinfo ? &tcpinfo->seq : NULL);
+
 	return tvb_captured_length(tvb);
 }
 
@@ -3819,8 +3847,13 @@ dissect_http_tls(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 
 	/*
 	 * XXX - we need to provide an end-of-stream indication.
+	 * tls should also provide the byte offset inside the stream,
+	 * similar to TCP sequence numbers. It already provides the
+	 * app_handle to heuristic dissectors as the (void *)data,
+	 * so we'd have to change it everywhere or pass it a different
+	 * way (e.g., pinfo->pool proto data).
 	 */
-	dissect_http_on_stream(tvb, pinfo, tree, conv_data, FALSE);
+	dissect_http_on_stream(tvb, pinfo, tree, conv_data, FALSE, NULL);
 	return tvb_captured_length(tvb);
 }
 
@@ -3873,7 +3906,7 @@ dissect_http_sctp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	/*
 	 * XXX - we need to provide an end-of-stream indication.
 	 */
-	dissect_http_on_stream(tvb, pinfo, tree, conv_data, FALSE);
+	dissect_http_on_stream(tvb, pinfo, tree, conv_data, FALSE, NULL);
 	return tvb_captured_length(tvb);
 }
 
@@ -3889,7 +3922,7 @@ dissect_http(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 	 * XXX - what should be done about reassembly, pipelining, etc.
 	 * here?
 	 */
-	dissect_http_on_stream(tvb, pinfo, tree, conv_data, FALSE);
+	dissect_http_on_stream(tvb, pinfo, tree, conv_data, FALSE, NULL);
 	return tvb_captured_length(tvb);
 }
 
@@ -3900,7 +3933,7 @@ dissect_ssdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 	http_conv_t	*conv_data;
 
 	conv_data = get_http_conversation_data(pinfo, &conversation);
-	dissect_http_message(tvb, 0, pinfo, tree, conv_data, "SSDP", proto_ssdp, FALSE);
+	dissect_http_message(tvb, 0, pinfo, tree, conv_data, "SSDP", proto_ssdp, FALSE, NULL);
 	return tvb_captured_length(tvb);
 }
 
@@ -3917,10 +3950,7 @@ range_add_http_tls_callback(guint32 port, gpointer ptr _U_) {
 static void reinit_http(void) {
 	http_tcp_range = prefs_get_range_value("http", "tcp.port");
 
-	dissector_delete_uint_range("sctp.port", http_sctp_range, http_sctp_handle);
-	wmem_free(wmem_epan_scope(), http_sctp_range);
-	http_sctp_range = range_copy(wmem_epan_scope(), global_http_sctp_range);
-	dissector_add_uint_range("sctp.port", http_sctp_range, http_sctp_handle);
+	http_sctp_range = prefs_get_range_value("http", "sctp.port");
 
 	range_foreach(http_tls_range, range_delete_http_tls_callback, NULL);
 	wmem_free(wmem_epan_scope(), http_tls_range);
@@ -4309,11 +4339,6 @@ proto_register_http(void)
 #endif
 	prefs_register_obsolete_preference(http_module, "tcp_alternate_port");
 
-	range_convert_str(wmem_epan_scope(), &global_http_sctp_range, SCTP_DEFAULT_RANGE, 65535);
-	prefs_register_range_preference(http_module, "sctp.port", "SCTP Ports",
-					"SCTP Ports range",
-					&global_http_sctp_range, 65535);
-
 	range_convert_str(wmem_epan_scope(), &global_http_tls_range, TLS_DEFAULT_RANGE, 65535);
 	prefs_register_range_preference(http_module, "tls.port", "SSL/TLS Ports",
 					"SSL/TLS Ports range",
@@ -4537,6 +4562,7 @@ proto_reg_handoff_message_http(void)
 	proto_http2 = proto_get_id_by_filter_name("http2");
 
 	dissector_add_uint_range_with_preference("tcp.port", TCP_DEFAULT_RANGE, http_tcp_handle);
+	dissector_add_uint_range_with_preference("sctp.port", SCTP_DEFAULT_RANGE, http_sctp_handle);
 
 	reinit_http();
 }

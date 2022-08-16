@@ -1,7 +1,7 @@
 /* packet-lte-rrc-template.c
  * Routines for Evolved Universal Terrestrial Radio Access (E-UTRA);
  * Radio Resource Control (RRC) protocol specification
- * (3GPP TS 36.331 V16.8.0 Release 16) packet dissection
+ * (3GPP TS 36.331 V17.1.0 Release 17) packet dissection
  * Copyright 2008, Vincent Helfre
  * Copyright 2009-2022, Pascal Quantin
  *
@@ -325,6 +325,9 @@ static gint ett_lte_rrc_sl_ParameterNR_r16 = -1;
 static gint ett_lte_rrc_v2x_BandParametersNR_r16 = -1;
 static gint ett_lte_rrc_ueAssistanceInformationNR_SCG_r16 = -1;
 static gint ett_lte_rrc_assistanceDataSIB_Element_r15 = -1;
+static gint ett_lte_rrc_overheatingAssistanceForSCG_r16 = -1;
+static gint ett_lte_rrc_overheatingAssistanceForSCG_FR2_2_r17 = -1;
+static gint ett_lte_rrc_triggerConditionSN_r17 = -1;
 
 static expert_field ei_lte_rrc_number_pages_le15 = EI_INIT;
 static expert_field ei_lte_rrc_si_info_value_changed = EI_INIT;
@@ -4477,7 +4480,10 @@ void proto_register_lte_rrc(void) {
     &ett_lte_rrc_sl_ParameterNR_r16,
     &ett_lte_rrc_v2x_BandParametersNR_r16,
     &ett_lte_rrc_ueAssistanceInformationNR_SCG_r16,
-    &ett_lte_rrc_assistanceDataSIB_Element_r15
+    &ett_lte_rrc_assistanceDataSIB_Element_r15,
+    &ett_lte_rrc_overheatingAssistanceForSCG_r16,
+    &ett_lte_rrc_overheatingAssistanceForSCG_FR2_2_r17,
+    &ett_lte_rrc_triggerConditionSN_r17
   };
 
   static ei_register_info ei[] = {

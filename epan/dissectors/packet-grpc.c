@@ -434,6 +434,9 @@ dissect_grpc(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data)
         grpc_ctx.is_request = (http_msg_info->type == HTTP_REQUEST);
         grpc_ctx.path = http_conv->request_uri;
         grpc_ctx.content_type = pinfo->match_string; /* only for grpc-web(-text) over http1.1 */
+        if (http_msg_info->data) {
+            grpc_ctx.encoding = (const gchar*)wmem_map_lookup((wmem_map_t *)http_msg_info->data, HTTP2_HEADER_GRPC_ENCODING);
+        }
     }
     else {
         /* unexpected protocol error */
@@ -504,7 +507,7 @@ proto_register_grpc(void)
     proto_register_field_array(proto_grpc, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
-    grpc_module = prefs_register_protocol(proto_grpc, proto_reg_handoff_grpc);
+    grpc_module = prefs_register_protocol(proto_grpc, NULL);
 
     prefs_register_bool_preference(grpc_module, "detect_json_automatically",
         "Always check whether the message is JSON regardless of content-type.",

@@ -408,8 +408,12 @@ class case_dissect_http2(subprocesstest.SubprocessTestCase):
                 '-o', 'tls.keylog_file: {}'.format(key_file),
                 '-z', 'follow,http2,hex,0,0'
             ))
+        # Stream ID 0 bytes
         self.assertTrue(self.grepOutput('00000000  00 00 12 04 00 00 00 00'))
+        # Stream ID 1 bytes, decrypted but compressed by HPACK
         self.assertFalse(self.grepOutput('00000000  00 00 2c 01 05 00 00 00'))
+        # Stream ID 1 bytes, decrypted and uncompressed
+        self.assertFalse(self.grepOutput('00000000  00 00 00 07 3a 6d 65 74'))
 
     def test_http2_follow_1(self, cmd_tshark, features, dirs, capture_file):
         '''Follow HTTP/2 Stream ID 1 test'''
@@ -421,8 +425,12 @@ class case_dissect_http2(subprocesstest.SubprocessTestCase):
                 '-o', 'tls.keylog_file: {}'.format(key_file),
                 '-z', 'follow,http2,hex,0,1'
             ))
+        # Stream ID 0 bytes
         self.assertFalse(self.grepOutput('00000000  00 00 12 04 00 00 00 00'))
-        self.assertTrue(self.grepOutput('00000000  00 00 2c 01 05 00 00 00'))
+        # Stream ID 1 bytes, decrypted but compressed by HPACK
+        self.assertFalse(self.grepOutput('00000000  00 00 2c 01 05 00 00 00'))
+        # Stream ID 1 bytes, decrypted and uncompressed
+        self.assertTrue(self.grepOutput('00000000  00 00 00 07 3a 6d 65 74'))
 
 @fixtures.mark_usefixtures('test_env')
 @fixtures.uses_fixtures
@@ -698,6 +706,42 @@ class case_dissect_tls(subprocesstest.SubprocessTestCase):
     def test_tls_handshake_reassembly_2(self, cmd_tshark, capture_file):
         '''Verify that TCP and TLS handshake reassembly works (second pass).'''
         self.check_tls_handshake_reassembly(
+            cmd_tshark, capture_file, extraArgs=['-2'])
+
+@fixtures.mark_usefixtures('test_env')
+@fixtures.uses_fixtures
+class case_dissect_quic(subprocesstest.SubprocessTestCase):
+    def check_quic_tls_handshake_reassembly(self, cmd_tshark, capture_file,
+                                       extraArgs=[]):
+        # An assortment of QUIC carrying TLS handshakes that need to be
+        # reassembled, including fragmented in one packet, fragmented in
+        # multiple packets, fragmented in multiple out of order packets,
+        # retried, retried with overlap from the original packets, and retried
+        # with one of the original packets missing (but all data there.)
+        # Include -zexpert just to be sure that nothing Warn or higher occured.
+        # Note level expert infos may be expected with the overlaps and
+        # retransmissions.
+        proc = self.assertRun([cmd_tshark,
+                               '-r', capture_file('quic-fragmented-handshakes.pcapng.gz'),
+                               '-zexpert,warn',
+                               '-Ytls.handshake.type',
+                               '-o', 'gui.column.format:"Handshake Type","%Cus:tls.handshake.type:0:R"',
+                               ] + extraArgs)
+        self.assertEqual(self.countOutput('Client Hello'), 18)
+        self.assertEqual(self.countOutput('Server Hello'), 2)
+        self.assertEqual(self.countOutput('Finished'), 2)
+        self.assertEqual(self.countOutput('New Session Ticket,New Session Ticket'), 1)
+        self.assertEqual(self.countOutput('Certificate'), 2)
+        self.assertFalse(self.grepOutput('Warns'))
+        self.assertFalse(self.grepOutput('Errors'))
+
+    def test_quic_tls_handshake_reassembly(self, cmd_tshark, capture_file):
+        '''Verify that QUIC and TLS handshake reassembly works.'''
+        self.check_quic_tls_handshake_reassembly(cmd_tshark, capture_file)
+
+    def test_quic_tls_handshake_reassembly_2(self, cmd_tshark, capture_file):
+        '''Verify that QUIC and TLS handshake reassembly works (second pass).'''
+        self.check_quic_tls_handshake_reassembly(
             cmd_tshark, capture_file, extraArgs=['-2'])
 
 @fixtures.mark_usefixtures('test_env')

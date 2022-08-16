@@ -1,7 +1,7 @@
 /* packet-nas_5gs.c
  * Routines for Non-Access-Stratum (NAS) protocol for 5G System (5GS) dissection
  *
- * Copyright 2018-2020, Anders Broman <anders.broman@ericsson.com>
+ * Copyright 2018-2022, Anders Broman <anders.broman@ericsson.com>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -5909,7 +5909,7 @@ nas_5gs_mm_registration_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
     /* 6E    Requested extended DRX parameters    Extended DRX parameters 9.11.3.60    O    TLV    3 */
     ELEM_OPT_TLV(0x6E, GSM_A_PDU_TYPE_GM, DE_EXT_DRX_PARAMS, NULL);
     /* 6A    T3324 value    GPRS timer 3 9.11.2.5    O    TLV    3 */
-    ELEM_OPT_TLV(0x6A, GSM_A_PDU_TYPE_GM, DE_GPRS_TIMER_2, " - T3324 value");
+    ELEM_OPT_TLV(0x6A, GSM_A_PDU_TYPE_GM, DE_GPRS_TIMER_3, " - T3324 value");
     /* 67    UE radio capability ID    UE radio capability ID 9.11.3.68    O    TLV    3-n */
     ELEM_OPT_TLV(0x67, NAS_5GS_PDU_TYPE_MM, DE_NAS_5GS_MM_UE_RADIO_CAP_ID, NULL);
     /* 35    Requested mapped NSSAI    Mapped NSSAI 9.11.3.31B    O    TLV    3-42 */
@@ -6002,7 +6002,7 @@ nas_5gs_mm_registration_accept(tvbuff_t *tvb, proto_tree *tree, packet_info *pin
     /* 6B    T3448 value    GPRS timer 3 9.11.2.4    O    TLV    3 */
     ELEM_OPT_TLV(0x6B, GSM_A_PDU_TYPE_GM, DE_GPRS_TIMER_2, " - T3448 value");
     /* 6A    T3324 value    GPRS timer 3 9.11.2.5    O    TLV    3 */
-    ELEM_OPT_TLV(0x6A, GSM_A_PDU_TYPE_GM, DE_GPRS_TIMER_2, " - T3324 value");
+    ELEM_OPT_TLV(0x6A, GSM_A_PDU_TYPE_GM, DE_GPRS_TIMER_3, " - T3324 value");
     /* 67    UE radio capability ID    UE radio capability ID 9.11.3.yy    O    TLV    3-n */
     ELEM_OPT_TLV(0x67, NAS_5GS_PDU_TYPE_MM, DE_NAS_5GS_MM_UE_RADIO_CAP_ID, NULL);
     /* E-    UE radio capability ID deletion indication    UE radio capability ID deletion indication 9.11.3.69    O    TV    1 */
@@ -7638,10 +7638,11 @@ de_nas_5gs_ursp_r_sel_desc(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree)
             offset++;
             break;
         case 0x02: /* S-NSSAI type*/
-            /* For "S-NSSAI type", the route selection descriptor component value field shall be encoded as a
-             * sequence of a one octet S-NSSAI length field and an S-NSSAI value field of a variable size.
-             * The S-NSSAI value shall be encoded as the value part of the S-NSSAI information element defined
-             * in clause 9.11.2.8 of 3GPP TS 24.501 */
+            /* For "S-NSSAI type", the route selection descriptor component value field shall be
+             * encoded as a sequence of a one octet S-NSSAI length field and an S-NSSAI value
+             * field of a variable size. The S-NSSAI value shall be encoded as the value part of the
+             * S-NSSAI information element defined in clause 9.11.2.8 of 3GPP TS 24.501 [11], without
+             * the mapped HPLMN SST field and without the mapped HPLMN SD field. */
             proto_tree_add_item_ret_uint(tree, hf_nas_5gs_mm_len_of_mapped_s_nssai, tvb, offset, 1, ENC_BIG_ENDIAN, &length);
             offset++;
             de_nas_5gs_cmn_s_nssai(tvb, tree, pinfo, offset, length, NULL, 0);

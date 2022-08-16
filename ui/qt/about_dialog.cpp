@@ -38,7 +38,6 @@
 #include "wsutil/file_util.h"
 #include "wsutil/tempfile.h"
 #include "wsutil/plugins.h"
-#include "wsutil/copyright_info.h"
 #include "ui/version_info.h"
 #include "ui/capture_globals.h"
 
@@ -63,11 +62,11 @@
 #include <QMenu>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QPlainTextEdit>
 
 AuthorListModel::AuthorListModel(QObject * parent) :
 AStringListListModel(parent)
 {
-    bool readAck = false;
     QFile f_authors;
 
     f_authors.setFileName(get_datafile_path("AUTHORS-SHORT"));
@@ -80,38 +79,24 @@ AStringListListModel(parent)
 #endif
 
     QRegularExpression rx("(.*)[<(]([\\s'a-zA-Z0-9._%+-]+(\\[[Aa][Tt]\\])?[a-zA-Z0-9._%+-]+)[>)]");
-    acknowledgement_.clear();
     while (!ReadFile_authors.atEnd()) {
         QString line = ReadFile_authors.readLine();
 
-        if (! readAck && line.trimmed().length() == 0)
+        if (line.trimmed().length() == 0)
                 continue;
         if (line.startsWith("------"))
             continue;
 
-        if (line.contains("Acknowledgements")) {
-            readAck = true;
-            continue;
+        QRegularExpressionMatch match = rx.match(line);
+        if (match.hasMatch()) {
+            appendRow(QStringList() << match.captured(1).trimmed() << match.captured(2).trimmed());
         }
-        else if (!readAck) {
-            QRegularExpressionMatch match = rx.match(line);
-            if (match.hasMatch())
-                appendRow(QStringList() << match.captured(1).trimmed() << match.captured(2).trimmed());
-        }
-
-        if (readAck && (!line.isEmpty() || !acknowledgement_.isEmpty()))
-            acknowledgement_.append(QString("%1\n").arg(line));
     }
     f_authors.close();
 
 }
 
 AuthorListModel::~AuthorListModel() { }
-
-QString AuthorListModel::acknowledgment() const
-{
-    return acknowledgement_;
-}
 
 QStringList AuthorListModel::headerColumns() const
 {
@@ -278,6 +263,7 @@ AboutDialog::AboutDialog(QWidget *parent) :
 {
     ui->setupUi(this);
     setAttribute(Qt::WA_DeleteOnClose, true);
+    QFile f_acknowledgements;
     QFile f_license;
 
     AuthorListModel * authorModel = new AuthorListModel(this);
@@ -288,10 +274,6 @@ AboutDialog::AboutDialog(QWidget *parent) :
     proxyAuthorModel->setColumnToFilter(1);
     ui->tblAuthors->setModel(proxyAuthorModel);
     ui->tblAuthors->setRootIsDecorated(false);
-    ui->pte_Authors->clear();
-    ui->pte_Authors->appendPlainText(authorModel->acknowledgment());
-    ui->pte_Authors->moveCursor(QTextCursor::Start);
-
     ui->tblAuthors->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->tblAuthors, &QTreeView::customContextMenuRequested, this, &AboutDialog::handleCopyMenu);
     connect(ui->searchAuthors, &QLineEdit::textChanged, proxyAuthorModel, &AStringListListSortFilterProxyModel::setFilter);
@@ -375,14 +357,36 @@ AboutDialog::AboutDialog(QWidget *parent) :
     connect(ui->tblShortcuts, &QTreeView::customContextMenuRequested, this, &AboutDialog::handleCopyMenu);
     connect(ui->searchShortcuts, &QLineEdit::textChanged, shortcutProxyModel, &AStringListListSortFilterProxyModel::setFilter);
 
+    /* Acknowledgements */
+    f_acknowledgements.setFileName(get_datafile_path("Acknowledgements.md"));
+
+    f_acknowledgements.open(QFile::ReadOnly | QFile::Text);
+    QTextStream ReadFile_acks(&f_acknowledgements);
+
+    /* QTextBrowser markdown support added in 5.14. */
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    QTextBrowser *textBrowserAcks = new QTextBrowser();
+    textBrowserAcks->setMarkdown(ReadFile_acks.readAll());
+    textBrowserAcks->setReadOnly(true);
+    textBrowserAcks->setOpenExternalLinks(true);
+    textBrowserAcks->moveCursor(QTextCursor::Start);
+    ui->ackVerticalLayout->addWidget(textBrowserAcks);
+#else
+    QPlainTextEdit *pte = new QPlainTextEdit();
+    pte->setPlainText(ReadFile_acks.readAll());
+    pte->setReadOnly(true);
+    pte->moveCursor(QTextCursor::Start);
+    ui->ackVerticalLayout->addWidget(pte);
+#endif
+
     /* License */
     f_license.setFileName(get_datafile_path("gpl-2.0-standalone.html"));
 
     f_license.open(QFile::ReadOnly | QFile::Text);
     QTextStream ReadFile_license(&f_license);
 
-    ui->textEditLicense->setHtml(ReadFile_license.readAll());
-    ui->textEditLicense->moveCursor(QTextCursor::Start);
+    ui->textBrowserLicense->setHtml(ReadFile_license.readAll());
+    ui->textBrowserLicense->moveCursor(QTextCursor::Start);
 }
 
 AboutDialog::~AboutDialog()
@@ -439,25 +443,25 @@ void AboutDialog::updateWiresharkText()
 {
     QString vcs_version_info_str = get_ws_vcs_version_info();
     QString copyright_info_str = get_copyright_info();
+    QString license_info_str = get_license_info();
     QString comp_info_str = gstring_free_to_qbytearray(get_compiled_version_info(gather_wireshark_qt_compiled_info));
     QString runtime_info_str = gstring_free_to_qbytearray(get_runtime_version_info(gather_wireshark_runtime_info));
 
     QString message = ColorUtils::themeLinkStyle();
 
     /* Construct the message string */
-    message += "<p>Version " + html_escape(vcs_version_info_str) + "</p>\n\n";
-    message += "<p>" + html_escape(copyright_info_str) + "</p>\n\n";
-    message += "<p>" + html_escape(comp_info_str) + "</p>\n\n";
-    message += "<p>" + html_escape(runtime_info_str) + "</p>\n\n";
-    message += "<p>Wireshark is Open Source Software released under the GNU General Public License.</p>\n\n";
-    message += "<p>Check the man page and ";
-    message += "<a href=https://www.wireshark.org>https://www.wireshark.org</a> ";
-    message += "for more information.</p>\n\n";
+    message += "<p>Version " + html_escape(vcs_version_info_str) + ".</p>\n";
+    message += "<p>" + html_escape(copyright_info_str) + "</p>\n";
+    message += "<p>" + html_escape(license_info_str) + "</p>\n";
+    message += "<p>" + html_escape(comp_info_str) + "</p>\n";
+    message += "<p>" + html_escape(runtime_info_str) + "</p>\n";
+    message += "<p>Check the man page and <a href=https://www.wireshark.org>www.wireshark.org</a> "
+               "for more information.</p>\n";
     ui->pte_wireshark->setHtml(message);
 
     /* Save the info for the clipboard copy */
     clipboardInfo = "";
-    clipboardInfo += vcs_version_info_str + "\n\n";
+    clipboardInfo += "Version " + vcs_version_info_str + ".\n\n";
     /* XXX: GCC 12.1 has a bogus stringop-overread warning using the Qt
      * conversions from QByteArray to QString at -O2 and higher due to
      * computing a branch that will never be taken.
@@ -466,7 +470,7 @@ void AboutDialog::updateWiresharkText()
 DIAG_OFF(stringop-overread)
 #endif
     clipboardInfo += gstring_free_to_qbytearray(get_compiled_version_info(gather_wireshark_qt_compiled_info)) + "\n";
-    clipboardInfo += gstring_free_to_qbytearray(get_runtime_version_info(gather_wireshark_runtime_info));
+    clipboardInfo += gstring_free_to_qbytearray(get_runtime_version_info(gather_wireshark_runtime_info)) + "\n";
 #if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
 DIAG_ON(stringop-overread)
 #endif

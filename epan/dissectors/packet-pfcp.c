@@ -35,8 +35,7 @@ static dissector_handle_t pfcp_3gpp_ies_handle;
 static dissector_handle_t pfcp_travelping_ies_handle;
 static dissector_handle_t pfcp_bbf_ies_handle;
 
-#define UDP_PORT_PFCP  8805
-static guint g_pfcp_port = UDP_PORT_PFCP;
+#define UDP_PORT_PFCP  8805 /* IANA-registered */
 
 static int proto_pfcp = -1;
 
@@ -284,7 +283,7 @@ static int hf_pfcp_up_function_features_o10_b5_resps = -1;
 static int hf_pfcp_up_function_features_o10_b4_upber = -1;
 static int hf_pfcp_up_function_features_o10_b3_l2tp = -1;
 static int hf_pfcp_up_function_features_o10_b2_nspoc = -1;
-static int hf_pfcp_up_function_features_o10_b1_quosf = -1;
+static int hf_pfcp_up_function_features_o10_b1_quasf = -1;
 static int hf_pfcp_up_function_features_o10_b0_rttwp = -1;
 static int hf_pfcp_up_function_features_o9_b7_rds = -1;
 static int hf_pfcp_up_function_features_o9_b6_ddds = -1;
@@ -3054,7 +3053,7 @@ dissect_pfcp_up_function_features(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
         &hf_pfcp_up_function_features_o10_b4_upber,
         &hf_pfcp_up_function_features_o10_b3_l2tp,
         &hf_pfcp_up_function_features_o10_b2_nspoc,
-        &hf_pfcp_up_function_features_o10_b1_quosf,
+        &hf_pfcp_up_function_features_o10_b1_quasf,
         &hf_pfcp_up_function_features_o10_b0_rttwp,
         NULL
     };
@@ -12602,10 +12601,10 @@ proto_register_pfcp(void)
             FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x01,
             "UPF support of RTT measurement towards the UE without PMF", HFILL }
         },
-        { &hf_pfcp_up_function_features_o10_b1_quosf,
-        { "QUOSF", "pfcp.up_function_features.quosf",
+        { &hf_pfcp_up_function_features_o10_b1_quasf,
+        { "QUASF", "pfcp.up_function_features.quasf",
             FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x02,
-            "UP function supports being provisioned with the Quota Action Application ID or a Quota Action SDF Filter to apply when reaching quotas", HFILL }
+            "The UP function supports being provisioned in a URR with an Exempted Application ID for Quota Action or an Exempted SDF Filter for Quota Action which is to be used when the quota is exhausted", HFILL }
         },
         { &hf_pfcp_up_function_features_o10_b2_nspoc,
         { "NSPOC", "pfcp.up_function_features.nspoc",
@@ -15283,7 +15282,7 @@ proto_register_pfcp(void)
 
     proto_pfcp = proto_register_protocol("Packet Forwarding Control Protocol", "PFCP", "pfcp");
     pfcp_handle = register_dissector("pfcp", dissect_pfcp, proto_pfcp);
-    module_pfcp = prefs_register_protocol(proto_pfcp, proto_reg_handoff_pfcp);
+    module_pfcp = prefs_register_protocol(proto_pfcp, NULL);
 
     proto_register_field_array(proto_pfcp, hf_pfcp, array_length(hf_pfcp));
     proto_register_subtree_array(ett, array_length(ett));
@@ -15298,7 +15297,6 @@ proto_register_pfcp(void)
     pfcp_travelping_ies_handle = register_dissector("pfcp_travelping_ies", dissect_pfcp_enterprise_travelping_ies, proto_pfcp);
     pfcp_bbf_ies_handle = register_dissector("pfcp_bbf_ies", dissect_pfcp_enterprise_bbf_ies, proto_pfcp);
 
-    prefs_register_uint_preference(module_pfcp, "port_pfcp", "PFCP port", "PFCP port (default 8805)", 10, &g_pfcp_port);
     prefs_register_bool_preference(module_pfcp, "track_pfcp_session", "Track PFCP session", "Track PFCP session", &g_pfcp_session);
     register_init_routine(pfcp_init);
     register_cleanup_routine(pfcp_cleanup);
@@ -15308,7 +15306,7 @@ proto_register_pfcp(void)
 void
 proto_reg_handoff_pfcp(void)
 {
-    dissector_add_uint("udp.port", g_pfcp_port, pfcp_handle);
+    dissector_add_uint_with_preference("udp.port", UDP_PORT_PFCP, pfcp_handle);
     /* Register 3GPP in the table to give expert info and serve as an example how to add decoding of enterprise IEs*/
     dissector_add_uint("pfcp.enterprise_ies", VENDOR_THE3GPP, pfcp_3gpp_ies_handle);
     /* Register Broadband Forum IEs */

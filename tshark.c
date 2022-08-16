@@ -2498,104 +2498,8 @@ clean_exit:
     return exit_status;
 }
 
-/*#define USE_BROKEN_G_MAIN_LOOP*/
-
-#ifdef USE_BROKEN_G_MAIN_LOOP
-    GMainLoop *loop;
-#else
-    gboolean loop_running = FALSE;
-#endif
-    guint32 packet_count = 0;
-
-
-typedef struct pipe_input_tag {
-    gint             source;
-    gpointer         user_data;
-    ws_process_id   *child_process;
-    pipe_input_cb_t  input_cb;
-    guint            pipe_input_id;
-#ifdef _WIN32
-    GMutex          *callback_running;
-#endif
-} pipe_input_t;
-
-static pipe_input_t pipe_input;
-
-#ifdef _WIN32
-/* The timer has expired, see if there's stuff to read from the pipe,
-   if so, do the callback */
-static gint
-pipe_timer_cb(gpointer data)
-{
-    HANDLE        handle;
-    DWORD         avail        = 0;
-    gboolean      result;
-    DWORD         childstatus;
-    pipe_input_t *pipe_input_p = data;
-    gint          iterations   = 0;
-
-    g_mutex_lock (pipe_input_p->callback_running);
-
-    /* try to read data from the pipe only 5 times, to avoid blocking */
-    while(iterations < 5) {
-        /* Oddly enough although Named pipes don't work on win9x,
-           PeekNamedPipe does !!! */
-        handle = (HANDLE) _get_osfhandle (pipe_input_p->source);
-        result = PeekNamedPipe(handle, NULL, 0, NULL, &avail, NULL);
-
-        /* Get the child process exit status */
-        GetExitCodeProcess((HANDLE)*(pipe_input_p->child_process),
-                &childstatus);
-
-        /* If the Peek returned an error, or there are bytes to be read
-           or the childwatcher thread has terminated then call the normal
-           callback */
-        if (!result || avail > 0 || childstatus != STILL_ACTIVE) {
-
-            /* And call the real handler */
-            if (!pipe_input_p->input_cb(pipe_input_p->source, pipe_input_p->user_data)) {
-                ws_debug("input pipe closed, iterations: %u", iterations);
-                /* pipe closed, return false so that the timer is stopped */
-                g_mutex_unlock (pipe_input_p->callback_running);
-                return FALSE;
-            }
-        }
-        else {
-            /* No data, stop now */
-            break;
-        }
-
-        iterations++;
-    }
-
-    g_mutex_unlock (pipe_input_p->callback_running);
-
-    /* we didn't stopped the timer, so let it run */
-    return TRUE;
-}
-#endif
-
-
-void
-pipe_input_set_handler(gint source, gpointer user_data, ws_process_id *child_process, pipe_input_cb_t input_cb)
-{
-
-    pipe_input.source         = source;
-    pipe_input.child_process  = child_process;
-    pipe_input.user_data      = user_data;
-    pipe_input.input_cb       = input_cb;
-
-#ifdef _WIN32
-    pipe_input.callback_running = g_new(GMutex, 1);
-    g_mutex_init(pipe_input.callback_running);
-    /* Tricky to use pipes in win9x, as no concept of wait.  NT can
-       do this but that doesn't cover all win32 platforms.  GTK can do
-       this but doesn't seem to work over processes.  Attempt to do
-       something similar here, start a timer and check for data on every
-       timeout. */
-    pipe_input.pipe_input_id = g_timeout_add(200, pipe_timer_cb, &pipe_input);
-#endif
-}
+gboolean loop_running = FALSE;
+guint32 packet_count = 0;
 
 static const nstime_t *
 tshark_get_frame_ts(struct packet_provider_data *prov, guint32 frame_num)
@@ -2638,9 +2542,7 @@ capture(void)
     volatile gboolean ret = TRUE;
     guint             i;
     GString          *str;
-#ifdef USE_TSHARK_SELECT
-    fd_set            readfds;
-#endif
+    GMainContext     *ctx;
 #ifndef _WIN32
     struct sigaction  action, oldaction;
 #endif
@@ -2714,54 +2616,15 @@ capture(void)
      */
     set_resolution_synchrony(TRUE);
 
-    /* the actual capture loop
-     *
-     * XXX - glib doesn't seem to provide any event based loop handling.
-     *
-     * XXX - for whatever reason,
-     * calling g_main_loop_new() ends up in 100% cpu load.
-     *
-     * But that doesn't matter: in UNIX we can use select() to find an input
-     * source with something to do.
-     *
-     * But that doesn't matter because we're in a CLI (that doesn't need to
-     * update a GUI or something at the same time) so it's OK if we block
-     * trying to read from the pipe.
-     *
-     * So all the stuff in USE_TSHARK_SELECT could be removed unless I'm
-     * wrong (but I leave it there in case I am...).
-     */
-
-#ifdef USE_TSHARK_SELECT
-    FD_ZERO(&readfds);
-    FD_SET(pipe_input.source, &readfds);
-#endif
-
+    /* the actual capture loop */
+    ctx = g_main_context_default();
     loop_running = TRUE;
 
     TRY
     {
         while (loop_running)
         {
-#ifdef USE_TSHARK_SELECT
-            ret = select(pipe_input.source+1, &readfds, NULL, NULL, NULL);
-
-            if (ret == -1)
-            {
-                fprintf(stderr, "%s: %s\n", "select()", g_strerror(errno));
-                ret = TRUE;
-                loop_running = FALSE;
-            } else if (ret == 1) {
-#endif
-                /* Call the real handler */
-                if (!pipe_input.input_cb(pipe_input.source, pipe_input.user_data)) {
-                    ws_debug("input pipe closed");
-                    ret = FALSE;
-                    loop_running = FALSE;
-                }
-#ifdef USE_TSHARK_SELECT
-            }
-#endif
+            g_main_context_iteration(ctx, TRUE);
         }
     }
     CATCH(OutOfMemoryError) {
@@ -3076,12 +2939,7 @@ capture_input_closed(capture_session *cap_session _U_, gchar *msg)
 
     report_counts();
 
-#ifdef USE_BROKEN_G_MAIN_LOOP
-    /*g_main_loop_quit(loop);*/
-    g_main_loop_quit(loop);
-#else
     loop_running = FALSE;
-#endif
 }
 
 #ifdef _WIN32

@@ -4343,6 +4343,8 @@ Fabrice Fontaine	<fontaine.fabrice[AT]gmail.com>
 Fabrizio Demaria	<fabrizio.demaria[AT]intel.com>
 Federico Di Pierro	<nierro92[AT]gmail.com>
 Felix Ruess		<felix.ruess[AT]roboception.de>
+Ferry Huberts		<ferry.huberts[AT]pelagic.nl>
+Ferry Huberts		<mailings[AT]hupie.com>
 Filip Kågesson		<exfik[AT]hms.se>
 Filip Sohajek		<filip.sohajek[AT]gmail.com>
 Filipe Laíns		<lains[AT]archlinux.org>
@@ -4576,6 +4578,7 @@ Laurenz Kamp		<laurenz.kamp[AT]gmx.de>
 Lee Mitchell		<lee[AT]indigopepper.com>
 Lee Serin		<serinee95[AT]gmail.com>
 Lev Stipakov		<lstipakov[AT]gmail.com>
+LiangYuxuan		<lyx[AT]lyx.es>
 Lichen Liu		<llc123456a[AT]gmail.com>
 Lin Sun			<lin.sun[AT]zoom.us>
 Lin Sun			<sunlin7[AT]yahoo.com>
@@ -4797,6 +4800,7 @@ Pedro Jose Marron	<pjmarron[AT]locoslab.com>
 Pedro Malagon		<malagon[AT]die.upm.es>
 Peng Li			<seudut[AT]gmail.com>
 Peng Tao		<tao.peng[AT]primarydata.com>
+Peter Dobransky		<pdobransky[AT]verizon.net>
 Peter Dobransky		<peter.dobransky[AT]harmonicinc.com>
 Peter Eszlari		<peter.eszlari[AT]gmail.com>
 Peter Hamilton		<qmear55[AT]protonmail.com>
@@ -4863,6 +4867,7 @@ Robert Shade		<rshade[AT]blueorigin.com>
 Rody Liu		<rody.liu[AT]ericsson.com>
 Roger Light		<roger[AT]atchoo.org>
 Rohan Saini		<rohan.saini[AT]nokia.com>
+Roi Berkovich		<roiberkovich[AT]gmail.com>
 Roland Haenel		<roland[AT]haenel.me>
 Roland Knall		<r.knall[AT]commend.com>
 Roland Knall		<r.knall[AT]moba.cc>
@@ -4923,6 +4928,7 @@ Shudong Zhou		<shudongzhou[AT]gmail.com>
 Signat Sibirskiy	<ord.blant[AT]gmail.com>
 Silvio Gissi		<silvio.gissi[AT]gmail.com>
 Simon Barber		<simon.barber[AT]meraki.net>
+Simon Cornish		<cgpmp5vkq2[AT]liamekaens.com>
 Simon Graham		<simgrxp[AT]gmail.com>
 Simon Holesch		<simon[AT]holesch.de>
 Simon Long		<hobei[AT]whitedoor.plus.com>
@@ -5139,28 +5145,3 @@ zhudewen		<zhudewen[AT]iauto.com>
 Øyvind Rønningstad	<ronningstad[AT]gmail.com>
 Đorđije Manojlović	<djordjije.manojlovic[AT]omicronenergy.com>
 Дмитрий Цветцих		<dmitrycvet[AT]gmail.com>
-
-
-= Acknowledgements =
-
-Dan Lasley <dlasley[AT]promus.com> gave permission for his dumpit() hex-dump routine to be used.
-
-We use the exception module from Kazlib, a C library written by Kaz Kylheku <kaz[AT]kylheku.com>. Thanks go to him for his well-written library. The Kazlib home page can be found at http://www.kylheku.com/~kaz/kazlib.html
-
-We use Lua BitOp, written by Mike Pall, for bitwise operations on numbers in Lua. The Lua BitOp home page can be found at https://bitop.luajit.org
-
-Snax <snax[AT]shmoo.com> gave permission to use the weak key detection code from Airsnort.
-
-IANA gave permission for their port-numbers file to be used.
-
-We use the natural order string comparison algorithm, written by Martin Pool <mbp[AT]sourcefrog.net>.
-
-Emanuel Eichhammer <support[AT]qcustomplot.com> granted permission to use QCustomPlot.
-
-Some icons made by Freepik, http://www.freepik.com from https://www.flaticon.com
-
-Insecure.Com LLC ("The Nmap Project") has granted the Wireshark Foundation permission to distribute Npcap with our Windows installers.
-
-We use the overflow-safe math functions from the portable snippets repository (https://github.com/nemequ/portable-snippets).
-
-We use the Lrexlib Lua library, specifically the PCRE2 flavour, to provide a regular expression API for Lua. The Lrexlib repository is hosted at https://github.com/rrthomas/lrexlib.

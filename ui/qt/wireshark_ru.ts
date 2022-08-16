@@ -28,8 +28,8 @@
         <translation>Копировать данные о версии в буфер обмена</translation>
     </message>
     <message>
-        <source>Copy To Clipboard</source>
-        <translation>Копировать В Буфер</translation>
+        <source>Copy to Clipboard</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Authors</source>
@@ -2243,6 +2243,22 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Relation</source>
         <translation>Отношение</translation>
+    </message>
+    <message>
+        <source>By default order comparisons and contains/matches/in relations are true if any value matches. The quantifier &quot;all&quot; can be used to apply the test to all values in a frame.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Quantifier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Any</source>
+        <translation type="unfinished">Любой</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Все</translation>
     </message>
     <message>
         <source>Match against this value.</source>

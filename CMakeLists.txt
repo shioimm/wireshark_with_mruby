@@ -39,9 +39,9 @@ endif()
 project(${_project_name} C CXX)
 
 # Updated by tools/make-version.py
-set(PROJECT_MAJOR_VERSION 3)
-set(PROJECT_MINOR_VERSION 7)
-set(PROJECT_PATCH_VERSION 2)
+set(PROJECT_MAJOR_VERSION 4)
+set(PROJECT_MINOR_VERSION 1)
+set(PROJECT_PATCH_VERSION 0)
 set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
@@ -1495,11 +1495,12 @@ if(ENABLE_CCACHE)
 		message(WARNING "Ccache is enabled, but your compiler is ${CMAKE_C_COMPILER_ID}."
 		" We wish you the best of luck.")
 	endif()
-	# https://stackoverflow.com/questions/1815688/how-to-use-ccache-with-cmake/24305849#24305849
 	find_program(CCACHE_EXECUTABLE ccache)
 	if(CCACHE_EXECUTABLE)
-		set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_EXECUTABLE}")
-		set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_EXECUTABLE}")
+		set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}")
+		set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}")
+		set(CMAKE_C_LINKER_LAUNCHER "${CCACHE_EXECUTABLE}")
+		set(CMAKE_CXX_LINKER_LAUNCHER "${CCACHE_EXECUTABLE}")
 	endif()
 endif()
 
@@ -1681,8 +1682,7 @@ if(ENABLE_PLUGINS)
 
 	# Build demo plugin, only if asked explicitly
 	if(ENABLE_PLUGIN_IFDEMO)
-		set(PLUGIN_SRC_DIRS
-			${PLUGIN_SRC_DIRS}
+		list(APPEND PLUGIN_SRC_DIRS
 			plugins/epan/pluginifdemo
 		)
 	endif()
@@ -1967,6 +1967,7 @@ set(INSTALL_DIRS
 
 # Installed into ${DATAFILE_DIR}
 set(INSTALL_FILES
+	Acknowledgements.md
 	docbook/ws.css
 	enterprises.tsv
 	gpl-2.0-standalone.html
@@ -2458,7 +2459,6 @@ set_target_properties(copy_data_files PROPERTIES FOLDER "Copy Tasks")
 # sources common for wireshark, tshark, rawshark and sharkd
 add_library(shark_common OBJECT
 	cfile.c
-	extcap.c
 	extcap_parser.c
 	file_packet_provider.c
 	frame_tvbuff.c
@@ -2477,6 +2477,7 @@ if(BUILD_wireshark AND QT_FOUND)
 	set(WIRESHARK_SRC
 		file.c
 		fileset.c
+		extcap.c
 		${PLATFORM_UI_SRC}
 	)
 	set(wireshark_FILES
@@ -2493,6 +2494,7 @@ if(BUILD_logray AND QT_FOUND)
 	set(LOGRAY_SRC
 		file.c
 		fileset.c
+		extcap.c
 		${PLATFORM_UI_SRC}
 	)
 	set(logray_FILES
@@ -2853,6 +2855,7 @@ if(BUILD_tshark)
 		$<TARGET_OBJECTS:shark_common>
 		tshark-tap-register.c
 		tshark.c
+		extcap.c
 		${TSHARK_TAP_SRC}
 	)
 
