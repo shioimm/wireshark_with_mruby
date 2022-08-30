@@ -1144,6 +1144,7 @@ decrypt_tls13_early_data(tvbuff_t *tvb, packet_info *pinfo, guint32 offset,
         0x1303, /* TLS_CHACHA20_POLY1305_SHA256 */
         0x1304, /* TLS_AES_128_CCM_SHA256 */
         0x1305, /* TLS_AES_128_CCM_8_SHA256 */
+        0x00c6, /* TLS_SM4_GCM_SM3 */
     };
     const guchar   *record = tvb_get_ptr(tvb, offset, record_length);
     for (guint i = 0; i < G_N_ELEMENTS(tls13_ciphers); i++) {
@@ -3501,11 +3502,11 @@ void ssl_set_master_secret(guint32 frame_num, address *addr_srv, address *addr_c
 
     ssl_debug_printf("\nssl_set_master_secret enter frame #%u\n", frame_num);
 
-    conversation = find_conversation(frame_num, addr_srv, addr_cli, conversation_pt_to_endpoint_type(ptype), port_srv, port_cli, 0);
+    conversation = find_conversation(frame_num, addr_srv, addr_cli, conversation_pt_to_conversation_type(ptype), port_srv, port_cli, 0);
 
     if (!conversation) {
         /* create a new conversation */
-        conversation = conversation_new(frame_num, addr_srv, addr_cli, conversation_pt_to_endpoint_type(ptype), port_srv, port_cli, 0);
+        conversation = conversation_new(frame_num, addr_srv, addr_cli, conversation_pt_to_conversation_type(ptype), port_srv, port_cli, 0);
         ssl_debug_printf("  new conversation = %p created\n", (void *)conversation);
     }
     ssl = ssl_get_session(conversation, tls_handle);

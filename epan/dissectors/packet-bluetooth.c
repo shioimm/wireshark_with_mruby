@@ -4412,19 +4412,19 @@ static const char* bluetooth_conv_get_filter_type(conv_item_t* conv, conv_filter
 static ct_dissector_info_t bluetooth_ct_dissector_info = {&bluetooth_conv_get_filter_type};
 
 
-static const char* bluetooth_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* bluetooth_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
     if (filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == AT_ETHER)
+        if (endpoint->myaddress.type == AT_ETHER)
             return "bluetooth.addr";
-        else if (host->myaddress.type == AT_STRINGZ)
+        else if (endpoint->myaddress.type == AT_STRINGZ)
             return "bluetooth.addr_str";
     }
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t  bluetooth_dissector_info = {&bluetooth_get_filter_type};
+static et_dissector_info_t  bluetooth_et_dissector_info = {&bluetooth_endpoint_get_filter_type};
 
 
 static tap_packet_status
@@ -4435,21 +4435,21 @@ bluetooth_conversation_packet(void *pct, packet_info *pinfo,
     hash->flags = flags;
     add_conversation_table_data(hash, &pinfo->dl_src, &pinfo->dl_dst, 0, 0, 1,
             pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts,
-            &bluetooth_ct_dissector_info, ENDPOINT_NONE);
+            &bluetooth_ct_dissector_info, CONVERSATION_NONE);
 
     return TAP_PACKET_REDRAW;
 }
 
 
 static tap_packet_status
-bluetooth_hostlist_packet(void *pit, packet_info *pinfo,
+bluetooth_endpoint_packet(void *pit, packet_info *pinfo,
         epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*) pit;
     hash->flags = flags;
 
-    add_hostlist_table_data(hash, &pinfo->dl_src, 0, TRUE,  1, pinfo->fd->pkt_len, &bluetooth_dissector_info, ENDPOINT_NONE);
-    add_hostlist_table_data(hash, &pinfo->dl_dst, 0, FALSE, 1, pinfo->fd->pkt_len, &bluetooth_dissector_info, ENDPOINT_NONE);
+    add_endpoint_table_data(hash, &pinfo->dl_src, 0, TRUE,  1, pinfo->fd->pkt_len, &bluetooth_et_dissector_info, ENDPOINT_NONE);
+    add_endpoint_table_data(hash, &pinfo->dl_dst, 0, FALSE, 1, pinfo->fd->pkt_len, &bluetooth_et_dissector_info, ENDPOINT_NONE);
 
     return TAP_PACKET_REDRAW;
 }
@@ -4463,7 +4463,7 @@ get_conversation(packet_info *pinfo,
 
     conversation = find_conversation(pinfo->num,
                                src_addr, dst_addr,
-                               ENDPOINT_BLUETOOTH,
+                               CONVERSATION_BLUETOOTH,
                                src_endpoint, dst_endpoint, 0);
     if (conversation) {
         return conversation;
@@ -4471,7 +4471,7 @@ get_conversation(packet_info *pinfo,
 
     conversation = conversation_new(pinfo->num,
                            src_addr, dst_addr,
-                           ENDPOINT_BLUETOOTH,
+                           CONVERSATION_BLUETOOTH,
                            src_endpoint, dst_endpoint, 0);
     return conversation;
 }
@@ -4901,7 +4901,7 @@ proto_register_bluetooth(void)
     bluetooth_uuid_table = register_dissector_table("bluetooth.uuid", "BT Service UUID", proto_bluetooth, FT_STRING, BASE_NONE);
     llc_add_oui(OUI_BLUETOOTH, "llc.bluetooth_pid", "LLC Bluetooth OUI PID", oui_hf, proto_bluetooth);
 
-    register_conversation_table(proto_bluetooth, TRUE, bluetooth_conversation_packet, bluetooth_hostlist_packet);
+    register_conversation_table(proto_bluetooth, TRUE, bluetooth_conversation_packet, bluetooth_endpoint_packet);
 
     register_decode_as(&bluetooth_uuid_da);
 }

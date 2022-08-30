@@ -54,7 +54,8 @@ set(PROJECT_VERSION "${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT
 set(LOG_PROJECT_NAME ${_log_project_name})
 set(LOG_PROJECT_MAJOR_VERSION 0)
 set(LOG_PROJECT_MINOR_VERSION 8)
-set(LOG_PROJECT_VERSION "${LOG_PROJECT_MAJOR_VERSION}.${LOG_PROJECT_MINOR_VERSION}.${PROJECT_PATCH_VERSION}${PROJECT_VERSION_EXTENSION}")
+set(LOG_PROJECT_PATCH_VERSION 3)
+set(LOG_PROJECT_VERSION "${LOG_PROJECT_MAJOR_VERSION}.${LOG_PROJECT_MINOR_VERSION}.${LOG_PROJECT_PATCH_VERSION}${PROJECT_VERSION_EXTENSION}")
 
 include( CMakeOptions.txt )
 
@@ -1185,12 +1186,14 @@ if(BUILD_wireshark OR BUILD_logray)
 	if(USE_qt6)
 		set(qtver "6")
 		if(DEFINED ENV{WIRESHARK_QT6_PREFIX_PATH})
-			set(CMAKE_PREFIX_PATH $ENV{WIRESHARK_QT6_PREFIX_PATH})
+			list(APPEND CMAKE_PREFIX_PATH $ENV{WIRESHARK_QT6_PREFIX_PATH})
 		endif()
 	else()
 		set(qtver "5")
+		if(DEFINED ENV{WIRESHARK_QT5_PREFIX_PATH})
+			list(APPEND CMAKE_PREFIX_PATH $ENV{WIRESHARK_QT5_PREFIX_PATH})
 		# XXX We used to recommend setting QT5_BASE_DIR. Remove after the 4.0 branch is created.
-		if(WIN32 AND DEFINED ENV{QT5_BASE_DIR})
+		elseif(WIN32 AND DEFINED ENV{QT5_BASE_DIR})
 			message(WARNING "Support for QT5_BASE_DIR will be removed in a future release.")
 			set(QT5_BASE_PATH "$ENV{QT5_BASE_DIR}")
 			set(CMAKE_PREFIX_PATH "${QT5_BASE_PATH}")
@@ -1612,6 +1615,8 @@ add_subdirectory( wsutil )
 
 if(BUILD_wireshark AND QT_FOUND)
 	add_subdirectory( ui/qt )
+elseif(BUILD_wireshark AND USE_qt6)
+	message(VERBOSE "To use Qt5 instead of Qt6 use CMake option USE_qt6=OFF.")
 endif()
 
 if(BUILD_logray AND QT_FOUND)
@@ -2002,6 +2007,7 @@ if (ASCIIDOCTOR_FOUND)
 		${CMAKE_BINARY_DIR}/doc/dumpcap.html
 		${CMAKE_BINARY_DIR}/doc/editcap.html
 		${CMAKE_BINARY_DIR}/doc/extcap.html
+		${CMAKE_BINARY_DIR}/doc/falcodump.html
 		${CMAKE_BINARY_DIR}/doc/mergecap.html
 		${CMAKE_BINARY_DIR}/doc/randpkt.html
 		${CMAKE_BINARY_DIR}/doc/randpktdump.html
@@ -3563,7 +3569,11 @@ if(RPMBUILD_EXECUTABLE)
 		list(APPEND _rpmbuild_with_args --with ccache)
 	endif()
 	if(NOT BUILD_wireshark)
-		list(APPEND _rpmbuild_with_args --without qt5)
+		list(APPEND _rpmbuild_with_args --without qt5 --without qt6)
+	elseif(USE_qt6)
+		list(APPEND _rpmbuild_with_args --without qt5 --with qt6)
+	else()
+		list(APPEND _rpmbuild_with_args --with qt5 --without qt6)
 	endif()
 	if (MAXMINDDB_FOUND)
 		list(APPEND _rpmbuild_with_args --with mmdbresolve)
@@ -3678,6 +3688,7 @@ set(CLEAN_C_FILES
 	${randpkt_FILES}
 	${randpktdump_FILES}
 	${etwdump_FILES}
+	${falcodump_FILES}
 	${udpdump_FILES}
 	${text2pcap_FILES}
 	${mergecap_FILES}
@@ -3936,6 +3947,14 @@ set(_test_group_list
 set(TEST_EXTRA_ARGS "" CACHE STRING "Extra arguments to pass to test/test.py")
 separate_arguments(TEST_EXTRA_ARGS)
 
+add_test(build_unittests
+	"${CMAKE_COMMAND}"
+	--build "${CMAKE_BINARY_DIR}"
+	--config "${CONFIG}"
+	--target test-programs
+)
+set_tests_properties(build_unittests PROPERTIES FIXTURES_SETUP unittests)
+
 foreach(_group_name ${_test_group_list})
 	add_test(
 		NAME ${_group_name}
@@ -3948,6 +3967,8 @@ foreach(_group_name ${_test_group_list})
 		)
 	set_tests_properties(${_group_name} PROPERTIES TIMEOUT 600)
 endforeach()
+
+set_tests_properties(suite_unittests PROPERTIES FIXTURES_REQUIRED unittests)
 
 # Make it possible to run pytest without passing the full path as argument.
 if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -4045,6 +4066,14 @@ configure_file(
 
 add_custom_target(uninstall
 	COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+
+# Break on programmer errors when debugging in Visual Studio
+if(MSVC)
+	get_property(_targets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
+	foreach(_target ${_targets})
+		set_target_properties(${_target} PROPERTIES VS_DEBUGGER_ENVIRONMENT "G_DEBUG=fatal-criticals")
+	endforeach()
+endif()
 
 #
 # Editor modelines  -  https://www.wireshark.org/tools/modelines.html

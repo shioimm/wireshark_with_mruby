@@ -660,6 +660,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-li5g.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-blf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-btsnoop.c
+	${CMAKE_CURRENT_SOURCE_DIR}/file-dlt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-elf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-file.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-gif.c
@@ -1574,6 +1575,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-obd-ii.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-obex.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ocfs2.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-ocp1.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-oicq.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-oipf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-olsr.c

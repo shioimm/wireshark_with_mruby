@@ -222,6 +222,7 @@ Debian Stable APT Package:
     paths:
       - debian-packages/*.deb
     expire_in: 3 days
+
 Debian Stable APT Test:
   extends: .test-linux
   rules: !reference [.if-merged]
@@ -245,6 +246,7 @@ Fedora RPM Package:
     - cmake3 -GNinja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja wireshark_rpm
+
 # Fedora RPM Test:
 #   extends: .test-rpm
 #   image: fedora
@@ -258,9 +260,10 @@ openSUSE 15.3 RPM Package:
   image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.3-dev
   script:
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -GNinja ..
+    - cmake -GNinja -DUSE_qt6=OFF ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja wireshark_rpm
+
 openSUSE 15.3 RPM Test:
   extends: .test-rpm
   image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.3-dev
@@ -274,9 +277,10 @@ Rocky Linux 9 RPM Package:
   image: registry.gitlab.com/wireshark/wireshark-containers/rockylinux-9-dev
   script:
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -GNinja ..
+    - cmake -GNinja -DUSE_qt6=OFF ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja wireshark_rpm
+
 Rocky Linux 9 RPM Test:
   extends: .test-rpm
   image: registry.gitlab.com/wireshark/wireshark-containers/rockylinux-9-dev
@@ -303,6 +307,7 @@ Ubuntu APT Package:
     paths:
       - ubuntu-packages/*.deb
     expire_in: 3 days
+
 Ubuntu APT Test:
   extends: .test-linux
   rules: !reference [.if-merged]
@@ -332,7 +337,7 @@ Win64 Package:
     - cd build
   script:
     - C:\Windows\py.exe ..\tools\make-version.py --set-release ..
-    - cmake -G "Visual Studio 17 2022" -A x64 -DUSE_qt6=ON -DENABLE_LTO=off ..
+    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_LTO=off ..
     - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_nsis_prep.vcxproj
@@ -367,6 +372,7 @@ macOS Arm Package:
     - wireshark-macos-arm-package
   retry: 1
   script:
+    - export CMAKE_PREFIX_PATH=/usr/local/Qt-6.2.4
     - tools/make-version.py --set-release .
     - mkdir build
     - cd build
@@ -399,13 +405,13 @@ macOS Intel Package:
     - wireshark-macos-intel-package
   retry: 1
   script:
-    - export CMAKE_PREFIX_PATH=/usr/local/Qt-5.15.3
+    - export CMAKE_PREFIX_PATH=/usr/local/Qt-6.2.4
     - export PATH="$PATH:$HOME/bin"
     - tools/make-version.py --set-release .
     - mkdir build
     - cd build
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -DENABLE_CCACHE=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DCMAKE_OSX_SYSROOT=macosx10.15 -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
+    - cmake -DENABLE_CCACHE=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=10.14 -DCMAKE_OSX_SYSROOT=macosx10.15 -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
     - package-prep
@@ -569,7 +575,7 @@ Windows Build:
   tags:
     - wireshark-windows-merge-req
   script:
-    - cmake -G "Visual Studio 17 2022" -A x64 -DUSE_qt6=ON -DENABLE_LTO=off ..
+    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_LTO=off ..
     - msbuild /verbosity:minimal /maxcpucount Wireshark.sln
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - ctest -C RelWithDebInfo --parallel 3 --force-new-ctest-process --output-on-failure
@@ -581,7 +587,7 @@ Windows Qt5 Build:
     - wireshark-windows-merge-req
   script:
     - $env:CMAKE_PREFIX_PATH = "C:\qt\5.15.2\msvc2019_64"
-    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_LTO=off ..
+    - cmake -G "Visual Studio 17 2022" -A x64 -DUSE_qt6=OFF -DENABLE_LTO=off ..
     - msbuild /verbosity:minimal /maxcpucount ui\qt\qtui.vcxproj
 
 # Adapted from https://www.synopsys.com/blogs/software-security/integrating-coverity-scan-with-gitlab-ci/
@@ -641,7 +647,7 @@ Coverity Visual C++ Scan:
     - $gitDescription = (( git describe --tags ) | Out-String).Trim()
     - C:\Windows\System32\curl --output $env:temp\cov-analysis-win64.zip --form project=$COVERITY_SCAN_PROJECT_NAME --form token=$COVERITY_SCAN_TOKEN https://scan.coverity.com/download/win64
     - C:\ProgramData\chocolatey\tools\7z x "$env:temp\cov-analysis-win64.zip" -y -r -o"$env:temp"
-    - cmake -DTEST_EXTRA_ARGS=--enable-release -DUSE_qt6=ON -DENABLE_LTO=off -G "Visual Studio 17 2022" -A x64 ..
+    - cmake -DTEST_EXTRA_ARGS=--enable-release -DENABLE_LTO=off -G "Visual Studio 17 2022" -A x64 ..
     - $covAnalysisWin64 = (Get-ChildItem -Path $env:temp -Filter "cov-analysis-win64-*" -Directory)[0].FullName
     - Invoke-Expression "& $covAnalysisWin64\bin\cov-build.exe --return-emit-failures --dir ..\cov-int msbuild /verbosity:minimal `"/consoleloggerparameters:PerformanceSummary;NoSummary`" /maxcpucount:1 Wireshark.sln"
     - cd ..
@@ -652,6 +658,7 @@ Coverity Visual C++ Scan:
     paths:
       - cov-int.zip
       - job_environment_variables.sh
+
 Coverity Visual C++ Submit:
   image: curlimages/curl
   rules:
@@ -698,7 +705,7 @@ Visual Studio Code Analysis:
       when: always
   script:
     - $env:caexcludepath = "C:\Qt;$env:INCLUDE"
-    - cmake -DENABLE_CODE_ANALYSIS=ON -G "Visual Studio 17 2022" -A x64 -DUSE_qt6=ON -DENABLE_LTO=off ..
+    - cmake -DENABLE_CODE_ANALYSIS=ON -G "Visual Studio 17 2022" -A x64 -DENABLE_LTO=off ..
     - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount:2 Wireshark.sln
 
 # Build all doxygen docs
@@ -838,6 +845,11 @@ ASan randpkt Fuzz:
 Valgrind Menagerie Fuzz:
   extends: .fuzz-ubuntu
   stage: fuzz-valgrind
+  variables:
+    # Use DWARF-4 debug info. Valgrind does not support Clang 14 with DWARF-5.
+    # https://gitlab.com/wireshark/wireshark/-/issues/18191
+    # https://www.mail-archive.com/valgrind-users@lists.sourceforge.net/msg07239.html
+    CFLAGS: "-gdwarf-4"
   script:
     - DEBIAN_FRONTEND=noninteractive apt-get update
     - DEBIAN_FRONTEND=noninteractive apt-get --yes install valgrind

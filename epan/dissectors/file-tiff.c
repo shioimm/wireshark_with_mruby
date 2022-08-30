@@ -64,7 +64,7 @@ static int hf_tiff_bits_per_sample = -1;
 #define TIFF_TAG_COMPRESSION 259
 static int hf_tiff_compression = -1;
 
-#define TIFF_TAG_PHOTOMETIC_INTERPRETATION 262
+#define TIFF_TAG_PHOTOMETRIC_INTERPRETATION 262
 static int hf_tiff_photometric_interp = -1;
 
 #define TIFF_TAG_THRESHHOLDING 263
@@ -287,7 +287,7 @@ static const value_string tiff_tag_names[] = {
     { TIFF_TAG_IMAGE_LENGTH, "Image Length" },
     { TIFF_TAG_BITS_PER_SAMPLE, "Bits Per Sample" },
     { TIFF_TAG_COMPRESSION, "Compression" },
-    { TIFF_TAG_PHOTOMETIC_INTERPRETATION, "Photometic Interpretation" },
+    { TIFF_TAG_PHOTOMETRIC_INTERPRETATION, "Photometric Interpretation" },
     { TIFF_TAG_THRESHHOLDING, "Threshholding" },
     { TIFF_TAG_CELL_WIDTH, "Cell Width" },
     { TIFF_TAG_CELL_LENGTH, "Cell Length" },
@@ -673,7 +673,7 @@ dissect_tiff_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 
     case TIFF_TAG_COMPRESSION:
         dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_compression);
         break;
-    case TIFF_TAG_PHOTOMETIC_INTERPRETATION:
+    case TIFF_TAG_PHOTOMETRIC_INTERPRETATION:
         dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_photometric_interp);
         break;
     case TIFF_TAG_THRESHHOLDING:
@@ -802,8 +802,10 @@ static int
 dissect_tiff(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_) {
     int encoding;
 
-    proto_item *ti = proto_tree_add_item(tree, proto_tiff, tvb, 0, -1, ENC_NA);
-    proto_tree *tiff_tree = proto_item_add_subtree(ti, ett_tiff);
+    // Reject if we don't have enough room for the heuristics
+    if (tvb_captured_length(tvb) < 4) {
+        return 0;
+    }
 
     // Figure out if we're big-endian or little endian
     guint16 raw_encoding = tvb_get_ntohs(tvb, 0);
@@ -819,17 +821,19 @@ dissect_tiff(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     }
 
     magic = tvb_get_guint16(tvb, 2, encoding);
-    ifd_offset = tvb_get_guint32(tvb, 4, encoding);
 
     // If the magic number isn't 42, abort with nothing decoded
     if (magic != 42) {
         return 0;
     }
 
+    proto_item *ti = proto_tree_add_item(tree, proto_tiff, tvb, 0, -1, ENC_NA);
+    proto_tree *tiff_tree = proto_item_add_subtree(ti, ett_tiff);
+
     // Dissect the rest of the header
     proto_tree_add_item(tiff_tree, hf_tiff_header_endianness, tvb, 0, 2, encoding);
     proto_tree_add_item(tiff_tree, hf_tiff_header_magic, tvb, 2, 2, encoding);
-    proto_tree_add_item(tiff_tree, hf_tiff_header_lead_ifd, tvb, 4, 4, encoding);
+    proto_tree_add_item_ret_uint(tiff_tree, hf_tiff_header_lead_ifd, tvb, 4, 4, encoding, &ifd_offset);
 
     // Keep dissecting IFDs until the offset to the next one is zero
     while (ifd_offset != 0) {

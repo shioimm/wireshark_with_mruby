@@ -766,21 +766,21 @@ ncp_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, 
 
     connection = (ncph->conn_high * 256)+ncph->conn_low;
     if (connection < 65535) {
-        add_conversation_table_data(hash, &pinfo->src, &pinfo->dst, connection, connection, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &ncp_ct_dissector_info, ENDPOINT_NCP);
+        add_conversation_table_data(hash, &pinfo->src, &pinfo->dst, connection, connection, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &ncp_ct_dissector_info, CONVERSATION_NCP);
     }
 
     return TAP_PACKET_REDRAW;
 }
 
-static const char* ncp_host_get_filter_type(hostlist_talker_t* host _U_, conv_filter_type_e filter)
+static const char* ncp_endpoint_get_filter_type(endpoint_item_t* endpoint _U_, conv_filter_type_e filter)
 {
     return ncp_conv_get_filter_type(NULL, filter);
 }
 
-static hostlist_dissector_info_t ncp_host_dissector_info = {&ncp_host_get_filter_type};
+static et_dissector_info_t ncp_endpoint_dissector_info = {&ncp_endpoint_get_filter_type};
 
 static tap_packet_status
-ncp_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
+ncp_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*) pit;
     hash->flags = flags;
@@ -789,9 +789,9 @@ ncp_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, cons
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
     packets are counted properly (even if address is sending to itself)
-    XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &pinfo->src, 0, TRUE, 1, pinfo->fd->pkt_len, &ncp_host_dissector_info, ENDPOINT_NCP);
-    add_hostlist_table_data(hash, &pinfo->dst, 0, FALSE, 1, pinfo->fd->pkt_len, &ncp_host_dissector_info, ENDPOINT_NCP);
+    XXX - this could probably be done more efficiently inside endpoint_table */
+    add_endpoint_table_data(hash, &pinfo->src, 0, TRUE, 1, pinfo->fd->pkt_len, &ncp_endpoint_dissector_info, ENDPOINT_NCP);
+    add_endpoint_table_data(hash, &pinfo->dst, 0, FALSE, 1, pinfo->fd->pkt_len, &ncp_endpoint_dissector_info, ENDPOINT_NCP);
 
     return TAP_PACKET_REDRAW;
 }
@@ -885,7 +885,7 @@ dissect_ncp_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * connection.
      */
     conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst,
-        ENDPOINT_NCP, (guint32) pinfo->srcport, (guint32) pinfo->destport,
+        CONVERSATION_NCP, (guint32) pinfo->srcport, (guint32) pinfo->destport,
         0);
     if ((ncpiph.length & 0x80000000) || ncpiph.signature == NCPIP_RPLY) {
         /* First time through we will record the initial connection and task
@@ -909,7 +909,7 @@ dissect_ncp_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                  * - create a new one.
                  */
                 conversation = conversation_new(pinfo->num, &pinfo->src,
-                    &pinfo->dst, ENDPOINT_NCP, (guint32) pinfo->srcport, (guint32) pinfo->destport, 0);
+                    &pinfo->dst, CONVERSATION_NCP, (guint32) pinfo->srcport, (guint32) pinfo->destport, 0);
                 mncp_hash_insert(conversation, nw_connection, header.task, pinfo);
             }
             /* If this is a request packet then we
@@ -951,7 +951,7 @@ dissect_ncp_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                  * - create a new one.
                  */
                 conversation = conversation_new(pinfo->num, &pinfo->src,
-                    &pinfo->dst, ENDPOINT_NCP, (guint32) pinfo->srcport, (guint32) pinfo->destport, 0);
+                    &pinfo->dst, CONVERSATION_NCP, (guint32) pinfo->srcport, (guint32) pinfo->destport, 0);
                 mncp_hash_insert(conversation, nw_connection, header.task, pinfo);
             }
             /* find the record telling us the request
@@ -1611,7 +1611,7 @@ proto_register_ncp(void)
     ncp_tap.stat=register_tap("ncp_srt");
     ncp_tap.hdr=register_tap("ncp");
 
-    register_conversation_table(proto_ncp, FALSE, ncp_conversation_packet, ncp_hostlist_packet);
+    register_conversation_table(proto_ncp, FALSE, ncp_conversation_packet, ncp_endpoint_packet);
     register_srt_table(proto_ncp, "ncp_srt", 24, ncpstat_packet, ncpstat_init, NULL);
 }
 

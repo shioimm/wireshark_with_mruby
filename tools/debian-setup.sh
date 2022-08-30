@@ -20,12 +20,18 @@ function print_usage() {
 	printf "\\t--install-optional: install optional software as well\\n"
 	printf "\\t--install-deb-deps: install packages required to build the .deb file\\n"
 	printf "\\t--install-test-deps: install packages required to run all tests\\n"
+	printf "\\t--install-qt5-deps: force installation of packages required to use Qt5\\n"
+	printf "\\t--install-qt6-deps: force installation of packages required to use Qt6\\n"
+	printf "\\t--install-all: install everything\\n"
 	printf "\\t[other]: other options are passed as-is to apt\\n"
 }
 
 ADDITIONAL=0
 DEBDEPS=0
 TESTDEPS=0
+ADD_QT5=0
+ADD_QT6=0
+HAVE_ADD_QT=0
 OPTIONS=
 for arg; do
 	case $arg in
@@ -41,6 +47,20 @@ for arg; do
 			;;
 		--install-test-deps)
 			TESTDEPS=1
+			;;
+		--install-qt5-deps)
+			ADD_QT5=1
+			;;
+		--install-qt6-deps)
+			ADD_QT6=1
+			;;
+		--install-all)
+			ADDITIONAL=1
+			DEBDEPS=1
+			TESTDEPS=1
+			ADD_QT5=1
+			ADD_QT6=1
+			HAVE_ADD_QT=1
 			;;
 		*)
 			OPTIONS="$OPTIONS $arg"
@@ -58,14 +78,6 @@ fi
 BASIC_LIST="gcc \
 	g++\
 	libglib2.0-dev \
-	qttools5-dev \
-	qttools5-dev-tools \
-	libqt5svg5-dev \
-	qtmultimedia5-dev \
-	qtbase5-dev \
-	qtchooser \
-	qt5-qmake \
-	qtbase5-dev-tools \
 	libc-ares-dev \
 	libpcap-dev \
 	libpcre2-dev \
@@ -73,6 +85,55 @@ BASIC_LIST="gcc \
 	make \
 	python3 \
 	libgcrypt-dev"
+
+QT5_LIST="qttools5-dev \
+	qttools5-dev-tools \
+	libqt5svg5-dev \
+	qtmultimedia5-dev \
+	qtbase5-dev \
+	qtchooser \
+	qt5-qmake \
+	qtbase5-dev-tools"
+
+QT6_LIST="qt6-base-dev \
+	qt6-multimedia-dev \
+	qt6-tools-dev \
+	qt6-tools-dev-tools \
+	qt6-l10n-tools \
+	libqt6core5compat6-dev \
+	freeglut3-dev \
+	libvulkan-dev \
+	libxkbcommon-dev"
+
+if [ $ADD_QT5 -ne 0 ]
+then
+	BASIC_LIST="$BASIC_LIST $QT5_LIST"
+	HAVE_ADD_QT=1
+fi
+
+if [ $ADD_QT6 -ne 0 ]
+then
+	BASIC_LIST="$BASIC_LIST $QT6_LIST"
+	HAVE_ADD_QT=1
+fi
+
+if [ $HAVE_ADD_QT -eq 0 ]
+then
+	# Try to select Qt version from distro
+	test -e /etc/os-release && os_release='/etc/os-release' || os_release='/usr/lib/os-release'
+	# shellcheck disable=SC1090
+	. "${os_release}"
+
+	# Ubuntu 22.04 (jammy) or later
+	MAJOR=$(echo "$VERSION_ID" | cut -f1 -d.)
+	if [ "${ID:-linux}" = "ubuntu" ] && [ "${MAJOR:-0}" -ge "22" ]; then
+		echo "Installing Qt6."
+		BASIC_LIST="$BASIC_LIST $QT6_LIST"
+	else
+		echo "Installing Qt5."
+		BASIC_LIST="$BASIC_LIST $QT5_LIST"
+	fi
+fi
 
 ADDITIONAL_LIST="libnl-3-dev \
 	libkrb5-dev \
@@ -93,7 +154,8 @@ ADDITIONAL_LIST="libnl-3-dev \
 	perl \
 	xsltproc \
 	ccache \
-	libspeexdsp-dev"
+	libspeexdsp-dev \
+	doxygen"
 
 # Uncomment to add PNG compression utilities used by compress-pngs:
 # ADDITIONAL_LIST="$ADDITIONAL_LIST \
@@ -180,6 +242,10 @@ echo "libilbc-dev is unavailable"
 # opus library libopus-dev
 add_package ADDITIONAL_LIST libopus-dev ||
     echo "libopus-dev is unavailable"
+
+# bcg729 library libbcg729-dev
+add_package ADDITIONAL_LIST libbcg729-dev ||
+    echo "libbcg729-dev is unavailable"
 
 # softhsm2 2.0.0: Ubuntu 16.04
 # softhsm2 2.2.0: Debian >= jessie-backports, Ubuntu 18.04

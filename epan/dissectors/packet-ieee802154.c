@@ -1325,10 +1325,10 @@ static conversation_t *_find_or_create_conversation(packet_info *pinfo, const ad
     conversation_t *conv = NULL;
 
     /* Have we seen this conversation before? */
-    conv = find_conversation(pinfo->num, src_addr, dst_addr, ENDPOINT_NONE, 0, 0, 0);
+    conv = find_conversation(pinfo->num, src_addr, dst_addr, CONVERSATION_NONE, 0, 0, 0);
     if (conv == NULL) {
         /* No, this is a new conversation. */
-        conv = conversation_new(pinfo->num, src_addr, dst_addr, ENDPOINT_NONE, 0, 0, 0);
+        conv = conversation_new(pinfo->num, src_addr, dst_addr, CONVERSATION_NONE, 0, 0, 0);
     }
     return conv;
 }
@@ -5598,37 +5598,37 @@ static tap_packet_status ieee802154_conversation_packet(void *pct, packet_info *
 
     add_conversation_table_data(hash, &pinfo->dl_src, &pinfo->dl_dst, 0, 0, 1,
             pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts,
-            &ieee802154_ct_dissector_info, ENDPOINT_NONE);
+            &ieee802154_ct_dissector_info, CONVERSATION_NONE);
 
     return TAP_PACKET_REDRAW;
 }
 
-static const char* ieee802154_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* ieee802154_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
     if (filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == ieee802_15_4_short_address_type)
+        if (endpoint->myaddress.type == ieee802_15_4_short_address_type)
             return "wpan.addr16";
-        else if (host->myaddress.type == AT_EUI64)
+        else if (endpoint->myaddress.type == AT_EUI64)
             return "wpan.addr64";
     }
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t ieee802154_host_dissector_info = {&ieee802154_host_get_filter_type };
+static et_dissector_info_t ieee802154_endpoint_dissector_info = {&ieee802154_endpoint_get_filter_type };
 
-static tap_packet_status ieee802154_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
+static tap_packet_status ieee802154_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*)pit;
     hash->flags = flags;
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
      packets are counted properly (even if address is sending to itself)
-     XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &pinfo->dl_src, 0, TRUE, 1,
-            pinfo->fd->pkt_len, &ieee802154_host_dissector_info, ENDPOINT_NONE);
-    add_hostlist_table_data(hash, &pinfo->dl_dst, 0, FALSE, 1,
-            pinfo->fd->pkt_len, &ieee802154_host_dissector_info, ENDPOINT_NONE);
+     XXX - this could probably be done more efficiently inside endpoint_table */
+    add_endpoint_table_data(hash, &pinfo->dl_src, 0, TRUE, 1,
+            pinfo->fd->pkt_len, &ieee802154_endpoint_dissector_info, ENDPOINT_NONE);
+    add_endpoint_table_data(hash, &pinfo->dl_dst, 0, FALSE, 1,
+            pinfo->fd->pkt_len, &ieee802154_endpoint_dissector_info, ENDPOINT_NONE);
 
     return TAP_PACKET_REDRAW;
 }
@@ -7024,7 +7024,7 @@ void proto_register_ieee802154(void)
 
     ieee802154_tap = register_tap(IEEE802154_PROTOABBREV_WPAN);
 
-    register_conversation_table(proto_ieee802154, TRUE, ieee802154_conversation_packet, ieee802154_hostlist_packet);
+    register_conversation_table(proto_ieee802154, TRUE, ieee802154_conversation_packet, ieee802154_endpoint_packet);
     register_conversation_filter(IEEE802154_PROTOABBREV_WPAN, "IEEE 802.15.4", ieee802154_filter_valid, ieee802154_build_filter);
 } /* proto_register_ieee802154 */
 

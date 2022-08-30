@@ -80,6 +80,8 @@
 void proto_register_dccp(void);
 void proto_reg_handoff_dccp(void);
 
+static dissector_handle_t dccp_handle;
+
 /*
  * FF: please keep this list in sync with
  * http://www.iana.org/assignments/dccp-parameters/dccp-parameters.xml
@@ -281,7 +283,7 @@ decode_dccp_ports(tvbuff_t *tvb, int offset, packet_info *pinfo,
      * determine if this packet is part of a conversation and call dissector
      * for the conversation if available
      */
-    if (try_conversation_dissector(&pinfo->src, &pinfo->dst, ENDPOINT_DCCP, sport,
+    if (try_conversation_dissector(&pinfo->src, &pinfo->dst, CONVERSATION_DCCP, sport,
                                    dport, next_tvb, pinfo, tree, NULL, 0)) {
         return;
     }
@@ -446,12 +448,12 @@ dccpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U
     hash->flags = flags;
     const e_dccphdr *dccphdr=(const e_dccphdr *)vip;
 
-    add_conversation_table_data_with_conv_id(hash, &dccphdr->ip_src, &dccphdr->ip_dst, dccphdr->sport, dccphdr->dport, (conv_id_t) dccphdr->stream, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &dccp_ct_dissector_info, ENDPOINT_DCCP);
+    add_conversation_table_data_with_conv_id(hash, &dccphdr->ip_src, &dccphdr->ip_dst, dccphdr->sport, dccphdr->dport, (conv_id_t) dccphdr->stream, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &dccp_ct_dissector_info, CONVERSATION_DCCP);
 
     return TAP_PACKET_REDRAW;
 }
 
-static const char* dccp_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* dccp_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
 
     if (filter == CONV_FT_SRC_PORT)
@@ -463,39 +465,39 @@ static const char* dccp_host_get_filter_type(hostlist_talker_t* host, conv_filte
     if (filter == CONV_FT_ANY_PORT)
         return "dccp.port";
 
-    if(!host) {
+    if(!endpoint) {
         return CONV_FILTER_INVALID;
     }
 
 
     if (filter == CONV_FT_SRC_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.src";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.src";
     }
 
     if (filter == CONV_FT_DST_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.dst";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.dst";
     }
 
     if (filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.addr";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.addr";
     }
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t dccp_host_dissector_info = {&dccp_host_get_filter_type};
+static et_dissector_info_t dccp_endpoint_dissector_info = {&dccp_endpoint_get_filter_type};
 
 static tap_packet_status
-dccpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags )
+dccpip_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags )
 {
     conv_hash_t *hash = (conv_hash_t*) pit;
     hash->flags = flags;
@@ -503,9 +505,9 @@ dccpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, c
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
     packets are counted properly (even if address is sending to itself)
-    XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &dccphdr->ip_src, dccphdr->sport, TRUE, 1, pinfo->fd->pkt_len, &dccp_host_dissector_info, ENDPOINT_DCCP);
-    add_hostlist_table_data(hash, &dccphdr->ip_dst, dccphdr->dport, FALSE, 1, pinfo->fd->pkt_len, &dccp_host_dissector_info, ENDPOINT_DCCP);
+    XXX - this could probably be done more efficiently inside endpoint_table */
+    add_endpoint_table_data(hash, &dccphdr->ip_src, dccphdr->sport, TRUE, 1, pinfo->fd->pkt_len, &dccp_endpoint_dissector_info, ENDPOINT_DCCP);
+    add_endpoint_table_data(hash, &dccphdr->ip_dst, dccphdr->dport, FALSE, 1, pinfo->fd->pkt_len, &dccp_endpoint_dissector_info, ENDPOINT_DCCP);
 
     return TAP_PACKET_REDRAW;
 }
@@ -558,7 +560,7 @@ static gchar *dccp_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinf
     if (((pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4) ||
         (pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6))
         && (pinfo->ptype == PT_DCCP) &&
-        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, ENDPOINT_DCCP, pinfo->srcport, pinfo->destport, 0)) != NULL)
+        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, CONVERSATION_DCCP, pinfo->srcport, pinfo->destport, 0)) != NULL)
     {
         /* DCCP over IPv4/6 */
         dccpd = get_dccp_conversation_data(conv, pinfo);
@@ -1686,6 +1688,7 @@ proto_register_dccp(void)
     proto_dccp =
         proto_register_protocol("Datagram Congestion Control Protocol", "DCCP",
                                 "dccp");
+    dccp_handle = register_dissector("dccp", dissect_dccp, proto_dccp);
     proto_register_field_array(proto_dccp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
     expert_dccp = expert_register_protocol(proto_dccp);
@@ -1727,7 +1730,7 @@ proto_register_dccp(void)
         "Make the DCCP dissector use relative sequence numbers instead of absolute ones.",
         &dccp_relative_seq);
 
-    register_conversation_table(proto_dccp, FALSE, dccpip_conversation_packet, dccpip_hostlist_packet);
+    register_conversation_table(proto_dccp, FALSE, dccpip_conversation_packet, dccpip_endpoint_packet);
     register_conversation_filter("dccp", "DCCP", dccp_filter_valid, dccp_build_filter);
     register_follow_stream(proto_dccp, "dccp_follow", dccp_follow_conv_filter, dccp_follow_index_filter, dccp_follow_address_filter,
                            dccp_port_to_display, follow_tvb_tap_listener);
@@ -1738,9 +1741,6 @@ proto_register_dccp(void)
 void
 proto_reg_handoff_dccp(void)
 {
-    dissector_handle_t dccp_handle;
-
-    dccp_handle = create_dissector_handle(dissect_dccp, proto_dccp);
     dissector_add_uint("ip.proto", IP_PROTO_DCCP, dccp_handle);
     dccp_tap    = register_tap("dccp");
     dccp_follow_tap = register_tap("dccp_follow");

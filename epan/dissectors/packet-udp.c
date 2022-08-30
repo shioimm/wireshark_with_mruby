@@ -281,12 +281,12 @@ udpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_
     add_conversation_table_data_with_conv_id(hash,
                 &udphdr->ip_src, &udphdr->ip_dst, udphdr->uh_sport, udphdr->uh_dport,
                 (conv_id_t) udphdr->uh_stream, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts,
-                &udp_ct_dissector_info, ENDPOINT_UDP);
+                &udp_ct_dissector_info, CONVERSATION_UDP);
 
     return TAP_PACKET_REDRAW;
 }
 
-static const char* udp_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* udp_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
 
     if (filter == CONV_FT_SRC_PORT)
@@ -298,39 +298,39 @@ static const char* udp_host_get_filter_type(hostlist_talker_t* host, conv_filter
     if (filter == CONV_FT_ANY_PORT)
         return "udp.port";
 
-    if(!host) {
+    if(!endpoint) {
         return CONV_FILTER_INVALID;
     }
 
 
     if (filter == CONV_FT_SRC_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.src";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.src";
     }
 
     if (filter == CONV_FT_DST_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.dst";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.dst";
     }
 
     if (filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.addr";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.addr";
     }
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t udp_host_dissector_info = {&udp_host_get_filter_type};
+static et_dissector_info_t udp_endpoint_dissector_info = {&udp_endpoint_get_filter_type};
 
 static tap_packet_status
-udpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
+udpip_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*) pit;
     hash->flags = flags;
@@ -339,9 +339,9 @@ udpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, co
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
     packets are counted properly (even if address is sending to itself)
-    XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &udphdr->ip_src, udphdr->uh_sport, TRUE, 1, pinfo->fd->pkt_len, &udp_host_dissector_info, ENDPOINT_UDP);
-    add_hostlist_table_data(hash, &udphdr->ip_dst, udphdr->uh_dport, FALSE, 1, pinfo->fd->pkt_len, &udp_host_dissector_info, ENDPOINT_UDP);
+    XXX - this could probably be done more efficiently inside endpoint_table */
+    add_endpoint_table_data(hash, &udphdr->ip_src, udphdr->uh_sport, TRUE, 1, pinfo->fd->pkt_len, &udp_endpoint_dissector_info, ENDPOINT_UDP);
+    add_endpoint_table_data(hash, &udphdr->ip_dst, udphdr->uh_dport, FALSE, 1, pinfo->fd->pkt_len, &udp_endpoint_dissector_info, ENDPOINT_UDP);
 
     return TAP_PACKET_REDRAW;
 }
@@ -388,7 +388,7 @@ static gchar *udp_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo
     if (((pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4) ||
         (pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6))
         && (pinfo->ptype == PT_UDP) &&
-        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, ENDPOINT_UDP, pinfo->srcport, pinfo->destport, 0)) != NULL)
+        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, CONVERSATION_UDP, pinfo->srcport, pinfo->destport, 0)) != NULL)
     {
         /* UDP over IPv4/6 */
         udpd=get_udp_conversation_data(conv, pinfo);
@@ -443,7 +443,7 @@ add_udp_process_info(guint32 frame_num, address *local_addr, address *remote_add
         return;
     }
 
-    conv = find_conversation(frame_num, local_addr, remote_addr, ENDPOINT_UDP, local_port, remote_port, 0);
+    conv = find_conversation(frame_num, local_addr, remote_addr, CONVERSATION_UDP, local_port, remote_port, 0);
     if (!conv) {
         return;
     }
@@ -534,7 +534,7 @@ static void
 handle_export_pdu_conversation(packet_info *pinfo, tvbuff_t *tvb, int uh_dport, int uh_sport)
 {
     if (have_tap_listener(exported_pdu_tap)) {
-        conversation_t *conversation = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, ENDPOINT_UDP, uh_dport, uh_sport, 0);
+        conversation_t *conversation = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP, uh_dport, uh_sport, 0);
         if (conversation != NULL) {
             dissector_handle_t handle = (dissector_handle_t)wmem_tree_lookup32_le(conversation->dissector_tree, pinfo->num);
             if (handle != NULL) {
@@ -602,7 +602,7 @@ decode_udp_ports(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
     /* determine if this packet is part of a conversation and call dissector */
     /* for the conversation if available */
-    if (try_conversation_dissector(&pinfo->dst, &pinfo->src, ENDPOINT_UDP,
+    if (try_conversation_dissector(&pinfo->dst, &pinfo->src, CONVERSATION_UDP,
              uh_dport, uh_sport, next_tvb, pinfo, tree, NULL, NO_ADDR_B|NO_PORT_B)) {
         handle_export_pdu_conversation(pinfo, next_tvb, uh_dport, uh_sport);
         return;
@@ -1473,7 +1473,7 @@ proto_register_udp(void)
                          &udplite_calculate_ts);
 
     register_decode_as(&udp_da);
-    register_conversation_table(proto_udp, FALSE, udpip_conversation_packet, udpip_hostlist_packet);
+    register_conversation_table(proto_udp, FALSE, udpip_conversation_packet, udpip_endpoint_packet);
     register_conversation_filter("udp", "UDP", udp_filter_valid, udp_build_filter);
     register_follow_stream(proto_udp, "udp_follow", udp_follow_conv_filter, udp_follow_index_filter, udp_follow_address_filter,
                         udp_port_to_display, follow_tvb_tap_listener);

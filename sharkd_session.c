@@ -804,7 +804,7 @@ sharkd_session_process_info_conv_cb(const void* key, void* value, void* userdata
         json_dumper_end_object(&dumper);
     }
 
-    if (get_hostlist_packet_func(table))
+    if (get_endpoint_packet_func(table))
     {
         json_dumper_begin_object(&dumper);
         sharkd_json_value_stringf("name", "Endpoint/%s", label);
@@ -2183,8 +2183,8 @@ sharkd_session_process_tap_conv_cb(void *arg)
 
             if (proto_with_port)
             {
-                sharkd_json_value_string("sport", (src_port = get_conversation_port(NULL, iui->src_port, iui->etype, iu->resolve_port)));
-                sharkd_json_value_string("dport", (dst_port = get_conversation_port(NULL, iui->dst_port, iui->etype, iu->resolve_port)));
+                sharkd_json_value_string("sport", (src_port = get_conversation_port(NULL, iui->src_port, iui->ctype, iu->resolve_port)));
+                sharkd_json_value_string("dport", (dst_port = get_conversation_port(NULL, iui->dst_port, iui->ctype, iu->resolve_port)));
 
                 wmem_free(NULL, src_port);
                 wmem_free(NULL, dst_port);
@@ -2221,28 +2221,28 @@ sharkd_session_process_tap_conv_cb(void *arg)
     {
         for (i = 0; i < iu->hash.conv_array->len; i++)
         {
-            hostlist_talker_t *host = &g_array_index(iu->hash.conv_array, hostlist_talker_t, i);
+            endpoint_item_t *endpoint = &g_array_index(iu->hash.conv_array, endpoint_item_t, i);
             char *host_str, *port_str;
             char *filter_str;
 
             json_dumper_begin_object(&dumper);
 
-            sharkd_json_value_string("host", (host_str = get_conversation_address(NULL, &host->myaddress, iu->resolve_name)));
+            sharkd_json_value_string("host", (host_str = get_conversation_address(NULL, &endpoint->myaddress, iu->resolve_name)));
 
             if (proto_with_port)
             {
-                sharkd_json_value_string("port", (port_str = get_conversation_port(NULL, host->port, host->etype, iu->resolve_port)));
+                sharkd_json_value_string("port", (port_str = get_endpoint_port(NULL, endpoint, iu->resolve_port)));
 
                 wmem_free(NULL, port_str);
             }
 
-            sharkd_json_value_anyf("rxf", "%" PRIu64, host->rx_frames);
-            sharkd_json_value_anyf("rxb", "%" PRIu64, host->rx_bytes);
+            sharkd_json_value_anyf("rxf", "%" PRIu64, endpoint->rx_frames);
+            sharkd_json_value_anyf("rxb", "%" PRIu64, endpoint->rx_bytes);
 
-            sharkd_json_value_anyf("txf", "%" PRIu64, host->tx_frames);
-            sharkd_json_value_anyf("txb", "%" PRIu64, host->tx_bytes);
+            sharkd_json_value_anyf("txf", "%" PRIu64, endpoint->tx_frames);
+            sharkd_json_value_anyf("txb", "%" PRIu64, endpoint->tx_bytes);
 
-            filter_str = get_hostlist_filter(host);
+            filter_str = get_endpoint_filter(endpoint);
             if (filter_str)
             {
                 sharkd_json_value_string("filter", filter_str);
@@ -2251,7 +2251,7 @@ sharkd_session_process_tap_conv_cb(void *arg)
 
             wmem_free(NULL, host_str);
 
-            if (sharkd_session_geoip_addr(&(host->myaddress), ""))
+            if (sharkd_session_geoip_addr(&(endpoint->myaddress), ""))
                 with_geoip = 1;
             json_dumper_end_object(&dumper);
         }
@@ -2276,7 +2276,7 @@ sharkd_session_free_tap_conv_cb(void *arg)
     }
     else if (!strncmp(iu->type, "endpt:", 6))
     {
-        reset_hostlist_table_data(hash);
+        reset_endpoint_table_data(hash);
     }
 
     g_free(iu);
@@ -2899,7 +2899,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
             {
                 ct = get_conversation_by_proto_id(proto_get_id_by_short_name(tok_tap + 6));
 
-                if (!ct || !(tap_func = get_hostlist_packet_func(ct)))
+                if (!ct || !(tap_func = get_endpoint_packet_func(ct)))
                 {
                     sharkd_json_error(
                             rpcid, -11004, NULL,

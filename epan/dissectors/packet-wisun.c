@@ -59,6 +59,7 @@ static reassembly_table netricity_reassembly_table;
 #define WISUN_SUBID_LTO    0x11
 #define WISUN_SUBID_PANID  0x12
 #define WISUN_SUBID_RT     0x1D
+#define WISUN_SUBID_LBC    0x80
 
 /* Wi-SUN Payload/Nested ID values. */
 #define WISUN_PIE_SUBID_US       0x01
@@ -152,6 +153,7 @@ static int hf_wisun_lbsie = -1;
 static int hf_wisun_lbsie_broadcast_interval = -1;
 static int hf_wisun_lbsie_broadcast_id = -1;
 static int hf_wisun_lbsie_channel_plan_tag = -1;
+static int hf_wisun_lbsie_broadcast_sync_period = -1;
 static int hf_wisun_lndie = -1;
 static int hf_wisun_lndie_response_threshold = -1;
 static int hf_wisun_lndie_response_delay = -1;
@@ -166,6 +168,9 @@ static int hf_wisun_panidie_panid = -1;
 static int hf_wisun_rtie = -1;
 static int hf_wisun_rtie_rendezvous_time = -1;
 static int hf_wisun_rtie_wakeup_interval = -1;
+static int hf_wisun_lbcie = -1;
+static int hf_wisun_lbcie_broadcast_interval = -1;
+static int hf_wisun_lbcie_broadcast_sync_period = -1;
 
 static int hf_wisun_pie = -1;
 static int hf_wisun_wsie = -1;
@@ -302,6 +307,7 @@ static gint ett_wisun_lndie = -1;
 static gint ett_wisun_ltoie = -1;
 static gint ett_wisun_panidie = -1;
 static gint ett_wisun_rtie = -1;
+static gint ett_wisun_lbcie = -1;
 static gint ett_wisun_panie = -1;
 static gint ett_wisun_panie_flags = -1;
 static gint ett_wisun_netnameie = -1;
@@ -376,6 +382,7 @@ static const value_string wisun_subid_vals[] = {
     { WISUN_SUBID_LTO,      "LFN Timing Offset IE" },
     { WISUN_SUBID_PANID,    "PAN Identifier IE" },
     { WISUN_SUBID_RT,       "Rendezvous Time IE" },
+    { WISUN_SUBID_LBC,      "LFN Broadcast Configuration IE" },
     { 0, NULL }
 };
 
@@ -824,6 +831,7 @@ dissect_wisun_lbsie(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
     proto_tree_add_item(tree, hf_wisun_lbsie_broadcast_interval, tvb, offset, 3, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(tree, hf_wisun_lbsie_broadcast_id, tvb, offset+3, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(tree, hf_wisun_lbsie_channel_plan_tag, tvb, offset+5, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_wisun_lbsie_broadcast_sync_period, tvb, offset+6, 1, ENC_LITTLE_ENDIAN);
     return 6;
 }
 
@@ -858,6 +866,14 @@ dissect_wisun_rtie(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guin
 {
     proto_tree_add_item(tree, hf_wisun_rtie_rendezvous_time, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(tree, hf_wisun_rtie_wakeup_interval, tvb, offset+2, 2, ENC_LITTLE_ENDIAN);
+    return 4;
+}
+
+static int
+dissect_wisun_lbcie(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint offset)
+{
+    proto_tree_add_item(tree, hf_wisun_lbcie_broadcast_interval, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_wisun_lbcie_broadcast_sync_period, tvb, offset+3, 1, ENC_LITTLE_ENDIAN);
     return 4;
 }
 
@@ -990,6 +1006,11 @@ dissect_wisun_hie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         case WISUN_SUBID_RT:
             subtree = wisun_create_hie_tree(tvb, tree, hf_wisun_rtie, ett_wisun_rtie);
             offset += dissect_wisun_rtie(tvb, pinfo, subtree, offset);
+            break;
+
+        case WISUN_SUBID_LBC:
+            subtree = wisun_create_hie_tree(tvb, tree, hf_wisun_lbcie, ett_wisun_lbcie);
+            offset += dissect_wisun_lbcie(tvb, pinfo, subtree, offset);
             break;
 
         default:
@@ -1838,6 +1859,11 @@ void proto_register_wisun(void)
             NULL, HFILL }
         },
 
+        { &hf_wisun_lbsie_broadcast_sync_period,
+          { "Broadcast Sync Period", "wisun.lbsie.broadcast_sync_period", FT_UINT8, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+
         { &hf_wisun_lndie,
           { "LFN Network Discovery IE", "wisun.lndie", FT_NONE, BASE_NONE, NULL, 0x0,
             NULL, HFILL }
@@ -1905,6 +1931,21 @@ void proto_register_wisun(void)
 
         { &hf_wisun_rtie_wakeup_interval,
           { "Wake-up Interval", "wisun.rtie.wakeup", FT_UINT16, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+
+        { &hf_wisun_lbcie,
+          { "LFN Broadcast Configuration IE", "wisun.lbcie", FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+
+        { &hf_wisun_lbcie_broadcast_interval,
+          { "Broadcast Interval", "wisun.lbcie.broadcast", FT_UINT24, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+
+        { &hf_wisun_lbcie_broadcast_sync_period,
+          { "Broadcast Sync Period", "wisun.lbcie.broadcast_sync_period", FT_UINT8, BASE_DEC, NULL, 0x0,
             NULL, HFILL }
         },
 
@@ -2440,6 +2481,7 @@ void proto_register_wisun(void)
         &ett_wisun_ltoie,
         &ett_wisun_panidie,
         &ett_wisun_rtie,
+        &ett_wisun_lbcie,
     };
 
     static ei_register_info ei[] = {

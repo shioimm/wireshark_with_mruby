@@ -3744,6 +3744,7 @@ Erik Rigtorp		<erik[AT]rigtorp.se> {
 
 Martin Mayer		<martin.mayer[AT]m2-it-solutions.de> {
 	Allied Telesis Loop Detection Frames (LDF) dissector
+	Open Control Protocol for AES70/OCA (OCP.1) dissector
 }
 
 Mattia Cazzola		<mattiac[AT]alinet.it> {
@@ -4093,6 +4094,7 @@ Andy Grover		<agrover[AT]cloudflare.com>
 Andy Ling		<Andy.Ling[AT]quantel.com>
 Andy Ling		<andy.ling[AT]s-a-m.com>
 Andy Zhao		<jinhzhx[AT]gmail.com>
+Angelo Spampinato	<aspampinato[AT]protonmail.com>
 Angelos Drossos		<wireshark.develangel[AT]mail.drossos.de>
 Anil Kumar		<anilkumar911[AT]gmail.com>
 Anndy Ke		<anndymaktub[AT]yahoo.com.tw>
@@ -4177,6 +4179,7 @@ Charles Nepveu		<charles.nepveu[AT]verint.com>
 Charlie Lenahan		<clenahan[AT]sonicbison.com>
 Chema Gonzalez		<chemag[AT]fb.com>
 Chema Gonzalez		<chemag[AT]gmail.com>
+Chien Wong		<m[AT]xv97.com>
 Chloe Pelling		<cpelling[AT]google.com>
 Chris Bontje		<chris_bontje[AT]selinc.com>
 Chris Brandson		<chris.brandson[AT]gmail.com>
@@ -4476,7 +4479,7 @@ Jeremy Browne		<jer[AT]ifni.ca>
 Jeremy Hitt		<jeremy.hitt[AT]isilon.com>
 Jeremy Kerr		<jk[AT]ozlabs.org>
 Jeremy Martin		<boardermartin[AT]gmail.com>
-Jeremy McCormick	<jeremy.mccormick[AT]craftdesigns.net>
+Jeremy McCormick	<jjmccormick[AT]protonmail.com>
 Jeroen Roovers		<jer[AT]gentoo.org>
 Jeroen Sack		<jeroen.sack[AT]agcocorp.com>
 Jeroen Sack		<jeroen[AT]jeroensack.nl>
@@ -4543,6 +4546,7 @@ Justin Iurman		<justin.iurman[AT]uliege.be>
 Justin J. Novack	<jnovack[AT]gmail.com>
 JustinKu		<jiunrong[AT]gmail.com>
 Jérôme LAFORGE		<jerome.laforge[AT]gmail.com>
+Jérôme Pouiller		<jerome.pouiller[AT]silabs.com>
 Jörg Mayer		<jmghc[AT]loplof.de>
 Ka-Shu Wong		<kswong[AT]exablaze.com>
 Kaige Ye		<ye[AT]kaige.org>
@@ -4950,6 +4954,7 @@ Stella Randall		<stella.randall[AT]emeerson.com>
 Stephan Kappertz	<octopus.sk[AT]googlemail.com>
 Stephane Bryant		<stephane.ml.bryant[AT]gmail.com>
 Stephen Donnelly	<stephen.donnelly[AT]endace.com>
+Stephen Hemminger	<stephen[AT]networkplumber.org>
 Steve Osselton		<steve.osselton[AT]gmail.com>
 Stijn Last		<stijn.last[AT]barco.com>
 Stéphane Lapie		<stephane.lapie[AT]darkbsd.org>

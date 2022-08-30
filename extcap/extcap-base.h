@@ -26,6 +26,10 @@
 
 #include <wsutil/socket.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 #define EXTCAP_BASE_OPTIONS_ENUM \
     EXTCAP_OPT_LIST_INTERFACES, \
     EXTCAP_OPT_VERSION, \
@@ -79,8 +83,16 @@ typedef struct _extcap_parameters
     gboolean debug;
 } extcap_parameters;
 
+/* used to inform to extcap application that end of application is requested */
+extern gboolean extcap_end_application;
+
 void extcap_base_register_interface(extcap_parameters * extcap, const char * interface, const char * ifdescription, uint16_t dlt, const char * dltdescription );
 void extcap_base_register_interface_ext(extcap_parameters * extcap, const char * interface, const char * ifdescription, uint16_t dlt, const char * dltname, const char * dltdescription );
+
+/* used to inform extcap framework that graceful shutdown supported by the extcap
+ */
+gboolean extcap_base_register_graceful_shutdown_cb(extcap_parameters * extcap, void (*callback)(void));
+
 void extcap_base_set_util_info(extcap_parameters * extcap, const char * exename, const char * major, const char * minor, const char * release, const char * helppage);
 void extcap_base_set_compiled_with(extcap_parameters * extcap, const char *fmt, ...);
 void extcap_base_set_running_with(extcap_parameters * extcap, const char *fmt, ...);
@@ -96,7 +108,11 @@ void extcap_config_debug(unsigned* count);
 void extcap_base_help(void);
 void extcap_log_init(const char *progname);
 
-#endif
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif // __EXTCAP_BASE_H__
 
 /*
  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html

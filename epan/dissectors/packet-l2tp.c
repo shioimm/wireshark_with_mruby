@@ -962,6 +962,7 @@ static dissector_handle_t llc_handle;
 
 static dissector_handle_t l2tp_udp_handle;
 static dissector_handle_t l2tp_ip_handle;
+static dissector_handle_t atm_oam_llc_handle;
 
 #define L2TP_HMAC_MD5  0
 #define L2TP_HMAC_SHA1 1
@@ -2905,16 +2906,16 @@ dissect_l2tp_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
      * the assigned L2TP port the entire time, due to NAT, firewalls, etc.
      * We support both methods by using conversations with no second port.
      */
-    conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_UDP,
+    conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_UDP,
                          pinfo->srcport, pinfo->destport, NO_PORT_B);
 
     if (conv == NULL || (conversation_get_dissector(conv, pinfo->num) != l2tp_udp_handle)) {
-        conv = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, ENDPOINT_UDP,
+        conv = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP,
                              pinfo->destport, pinfo->srcport, NO_PORT_B);
     }
 
     if ((conv == NULL) || (conversation_get_dissector(conv, pinfo->num) != l2tp_udp_handle)) {
-        conv = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_UDP,
+        conv = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_UDP,
                         pinfo->srcport, 0, NO_PORT2);
         conversation_set_dissector(conv, l2tp_udp_handle);
     }
@@ -3713,6 +3714,9 @@ proto_register_l2tp(void)
 
     proto_l2tp = proto_register_protocol(
         "Layer 2 Tunneling Protocol", "L2TP", "l2tp");
+    l2tp_udp_handle = register_dissector("lt2p_udp", dissect_l2tp_udp, proto_l2tp);
+    l2tp_ip_handle = register_dissector("l2tp_ip", dissect_l2tp_ip, proto_l2tp);
+    atm_oam_llc_handle = register_dissector("atm_oam_llc",  dissect_atm_oam_llc, proto_l2tp );
     proto_register_field_array(proto_l2tp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
     expert_l2tp = expert_register_protocol(proto_l2tp);
@@ -3742,7 +3746,7 @@ proto_register_l2tp(void)
     prefs_register_static_text_preference(l2tp_module, "protocol",
         "Dissection of pseudowire types is configured through \"Decode As\". "
         "Type 0 is used for sessions with unknown pseudowire type.",
-        "Pseudowire Type \"Decode As\" instuctions");
+        "Pseudowire Type \"Decode As\" instructions");
 
     prefs_register_string_preference(l2tp_module,"shared_secret","Shared Secret",
                                    "Shared secret used for control message digest authentication",
@@ -3755,12 +3759,7 @@ proto_register_l2tp(void)
 void
 proto_reg_handoff_l2tp(void)
 {
-    dissector_handle_t atm_oam_llc_handle;
-
-    l2tp_udp_handle = create_dissector_handle(dissect_l2tp_udp, proto_l2tp);
     dissector_add_uint_with_preference("udp.port", UDP_PORT_L2TP, l2tp_udp_handle);
-
-    l2tp_ip_handle = create_dissector_handle(dissect_l2tp_ip, proto_l2tp);
     dissector_add_uint("ip.proto", IP_PROTO_L2TP, l2tp_ip_handle);
 
     /*
@@ -3779,7 +3778,6 @@ proto_reg_handoff_l2tp(void)
     atm_oam_handle        = find_dissector_add_dependency("atm_oam_cell", proto_l2tp);
     llc_handle            = find_dissector_add_dependency("llc", proto_l2tp);
 
-    atm_oam_llc_handle = create_dissector_handle( dissect_atm_oam_llc, proto_l2tp );
     dissector_add_uint("l2tp.pw_type", L2TPv3_PW_AAL5, atm_oam_llc_handle);
 
     /*

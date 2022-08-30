@@ -327,6 +327,7 @@ static int is_http_request_or_reply(const gchar *data, int linelen,
 				    *reqresp_dissector, http_conv_t *conv_data);
 static guint chunked_encoding_dissector(tvbuff_t **tvb_ptr, packet_info *pinfo,
 					proto_tree *tree, int offset);
+static gboolean valid_header_name(const guchar *line, int header_len);
 static void process_header(tvbuff_t *tvb, int offset, int next_offset,
 			   const guchar *line, int linelen, int colon_offset,
 			   packet_info *pinfo, proto_tree *tree,
@@ -1180,15 +1181,28 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	if (!g_ascii_isprint(tvb_get_guint8(tvb, offset))) {
 		/*
 		 * But, if we've seen some real HTTP then we're sure this is
-		 * an HTTP conversation.  Mark it as such.
+		 * an HTTP conversation, and this is binary file data.
+		 * Mark it as such.
 		 */
 		if (have_seen_http) {
+			tvbuff_t *next_tvb;
+			const gchar *file_data;
+
 			col_set_str(pinfo->cinfo, COL_PROTOCOL, proto_tag);
 			col_set_str(pinfo->cinfo, COL_INFO, "Continuation");
 			ti = proto_tree_add_item(tree, proto, tvb, offset, -1, ENC_NA);
 			http_tree = proto_item_add_subtree(ti, ett_http);
 
-			call_data_dissector(tvb_new_subset_remaining(tvb, orig_offset), pinfo, http_tree);
+			next_tvb = tvb_new_subset_remaining(tvb, orig_offset);
+			/* Send it to Follow HTTP Stream and mark as file data */
+			if(have_tap_listener(http_follow_tap)) {
+				tap_queue_packet(http_follow_tap, pinfo, next_tvb);
+			}
+			file_data = tvb_get_string_enc(wmem_packet_scope(), next_tvb, 0, tvb_captured_length(next_tvb), ENC_ASCII);
+			proto_tree_add_string_format_value(http_tree, hf_http_file_data,
+				next_tvb, 0, tvb_captured_length(next_tvb), file_data, "%u bytes", tvb_captured_length(next_tvb));
+
+			call_data_dissector(next_tvb, pinfo, http_tree);
 		}
 		return -1;
 	}
@@ -1377,10 +1391,13 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		linep = (const guchar *)memchr(line, ':', linelen);
 		if (linep) {
 			/*
-			 * Colon found, assume it is a header.
+			 * Colon found, assume it is a header if we've seen a
+			 * valid line before. Check a little more if not.
 			 */
-			colon_offset += (int)(linep - line);
-			goto is_http;
+			if (saw_req_resp_or_header || valid_header_name(line, (int)(linep - line))) {
+				colon_offset += (int)(linep - line);
+				goto is_http;
+			}
 		}
 
 		/*
@@ -1736,6 +1753,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		if (headers.transfer_encoding_chunked) {
 			if (!http_dechunk_body) {
 				/* Chunking disabled, cannot dissect further. */
+				/* XXX: Should this be sent to the follow tap? */
 				call_data_dissector(next_tvb, pinfo, http_tree);
 				goto body_dissected;
 			}
@@ -1775,6 +1793,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			 * We currently can't handle, for example, "gzip",
 			 * "compress", or "deflate" as *transfer* encodings;
 			 * just handle them as data for now.
+			 * XXX: Should this be sent to the follow tap?
 			 */
 			call_data_dissector(next_tvb, pinfo, http_tree);
 			goto body_dissected;
@@ -1863,6 +1882,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 					expert_add_info(pinfo, e_ti, &ei_http_decompression_disabled);
 				}
 #endif
+				/* XXX: Should this be sent to the follow tap? */
 				call_data_dissector(next_tvb, pinfo, e_tree);
 
 				goto body_dissected;
@@ -1876,6 +1896,10 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		/* Save values for the Export Object GUI feature if we have
 		 * an active listener to process it (which happens when
 		 * the export object window is open). */
+		/* XXX: Do we really want to send it to Export Object if we didn't
+		 * get the headers, so that this is just a fragment of Continuation
+		 * Data and not a complete object?
+		 */
 		if(have_tap_listener(http_eo_tap)) {
 			eo_info = wmem_new(wmem_packet_scope(), http_eo_t);
 
@@ -1888,9 +1912,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			tap_queue_packet(http_eo_tap, pinfo, eo_info);
 		}
 
-		/* Save values for the Export Object GUI feature if we have
-		 * an active listener to process it (which happens when
-		 * the export object window is open). */
+		/* Send it to Follow HTTP Stream and mark as file data */
 		if(have_tap_listener(http_follow_tap)) {
 			tap_queue_packet(http_follow_tap, pinfo, next_tvb);
 		}
@@ -2605,7 +2627,7 @@ http_payload_subdissector(tvbuff_t *tvb, proto_tree *tree,
 			destport = pinfo->destport;
 		}
 
-		conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_TCP, srcport, destport, 0);
+		conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_TCP, srcport, destport, 0);
 
 		/* We may get stuck in a recursion loop if we let process_tcp_payload() call us.
 		 * So, if the port in the URI is one we're registered for or we have set up a
@@ -3048,6 +3070,32 @@ is_token_char(char c)
 	return strchr("!#$%&\\:*+-.^_`|~", c) || g_ascii_isalnum(c);
 }
 
+static gboolean
+valid_header_name(const guchar *line, int header_len)
+{
+
+	/*
+	 * Validate the header name. This allows no space between the field name
+	 * and colon (RFC 7230, Section. 3.2.4).
+	 */
+	if (header_len == 0) {
+		return FALSE;
+	}
+	for (int i = 0; i < header_len; i++) {
+		/*
+		 * NUL is not a valid character; treat it specially
+		 * due to C's notion that strings are NUL-terminated.
+		 */
+		if (line[i] == '\0') {
+			return FALSE;
+		}
+		if (!is_token_char(line[i])) {
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
 static void
 process_header(tvbuff_t *tvb, int offset, int next_offset,
 	       const guchar *line, int linelen, int colon_offset,
@@ -3074,31 +3122,10 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 	line_end_offset = offset + linelen;
 	header_len = colon_offset - offset;
 
-	/*
-	 * Validate the header name. This allows no space between the field name
-	 * and colon (RFC 7230, Section. 3.2.4).
-	 */
-	gboolean valid_header_name = header_len != 0;
-	if (valid_header_name) {
-		for (i = 0; i < header_len; i++) {
-			/*
-			 * NUL is not a valid character; treat it specially
-			 * due to C's notion that strings are NUL-terminated.
-			 */
-			if (line[i] == '\0') {
-				valid_header_name = FALSE;
-				break;
-			}
-			if (!is_token_char(line[i])) {
-				valid_header_name = FALSE;
-				break;
-			}
-		}
-	}
 	/**
 	 * Not a valid header name? Just add a line plus expert info.
 	 */
-	if (!valid_header_name) {
+	if (!valid_header_name(line, header_len)) {
 		if (http_type == HTTP_REQUEST) {
 			hf_index = hf_http_request_line;
 		} else if (http_type == HTTP_RESPONSE) {
