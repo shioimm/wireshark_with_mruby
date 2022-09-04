@@ -806,6 +806,21 @@ tvb_set_reported_length(tvbuff_t *tvb, const guint reported_length)
 		tvb->contained_length = reported_length;
 }
 
+/* Repair a tvbuff where the captured length is greater than the
+ * reported length; such a tvbuff makes no sense, as it's impossible
+ * to capture more data than is in the packet.
+ */
+void
+tvb_fix_reported_length(tvbuff_t *tvb)
+{
+	DISSECTOR_ASSERT(tvb && tvb->initialized);
+	DISSECTOR_ASSERT(tvb->reported_length < tvb->length);
+
+	tvb->reported_length = tvb->length;
+	if (tvb->contained_length < tvb->length)
+		tvb->contained_length = tvb->length;
+}
+
 guint
 tvb_offset_from_real_beginning_counter(const tvbuff_t *tvb, const guint counter)
 {
@@ -2291,23 +2306,38 @@ gint
 tvb_find_guint16(tvbuff_t *tvb, const gint offset, const gint maxlength,
 		 const guint16 needle)
 {
+	guint	      abs_offset = 0;
+	guint	      limit = 0;
+	int           exception;
+
+	exception = compute_offset_and_remaining(tvb, offset, &abs_offset, &limit);
+	if (exception)
+		THROW(exception);
+
+	/* Only search to end of tvbuff, w/o throwing exception. */
+	if (maxlength >= 0 && limit > (guint) maxlength) {
+		/* Maximum length doesn't go past end of tvbuff; search
+		   to that value. */
+		limit = (guint) maxlength;
+	}
+
 	const guint8 needle1 = ((needle & 0xFF00) >> 8);
 	const guint8 needle2 = ((needle & 0x00FF) >> 0);
-	gint searched_bytes = 0;
-	gint pos = offset;
+	guint searched_bytes = 0;
+	guint pos = abs_offset;
 
 	do {
 		gint offset1 =
-			tvb_find_guint8(tvb, pos, maxlength - searched_bytes, needle1);
+			tvb_find_guint8(tvb, pos, limit - searched_bytes, needle1);
 		gint offset2 = -1;
 
 		if (offset1 == -1) {
 			return -1;
 		}
 
-		searched_bytes = offset - pos + 1;
+		searched_bytes = (guint)offset1 - abs_offset + 1;
 
-		if ((maxlength != -1) && (searched_bytes >= maxlength)) {
+		if (searched_bytes >= limit) {
 			return -1;
 		}
 
@@ -2316,14 +2346,14 @@ tvb_find_guint16(tvbuff_t *tvb, const gint offset, const gint maxlength,
 		searched_bytes += 1;
 
 		if (offset2 != -1) {
-			if ((maxlength != -1) && (searched_bytes > maxlength)) {
+			if (searched_bytes > limit) {
 				return -1;
 			}
 			return offset1;
 		}
 
 		pos = offset1 + 1;
-	} while (searched_bytes < maxlength);
+	} while (searched_bytes < limit);
 
 	return -1;
 }

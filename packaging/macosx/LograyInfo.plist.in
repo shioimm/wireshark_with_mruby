@@ -9,7 +9,7 @@
 	<key>CFBundleGetInfoString</key>
 	<string>@LOG_PROJECT_VERSION@, Copyright 1998-2022 Wireshark Development Team</string>
 	<key>CFBundleIconFile</key>
-	<string>Wireshark.icns</string>
+	<string>Logray.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>org.wireshark.Logray</string>
 	<key>CFBundleDocumentTypes</key>
@@ -36,7 +36,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>@LOG_PROJECT_VERSION@</string>
 	<key>CFBundleSignature</key>
-	<string>Lshk</string>
+	<string>Lgry</string>
 	<key>CFBundleVersion</key>
 	<string>@LOG_PROJECT_VERSION@</string>
 	<key>NSHumanReadableCopyright</key>
