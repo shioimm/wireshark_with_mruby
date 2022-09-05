@@ -3,13 +3,13 @@
 #define MRB_SYM(mrb, name) mrb_symbol_value(mrb_intern_lit(mrb, name))
 
 typedef enum {
-  REGISTERATION,
+  REGISTRATION,
   DISSECTION,
 } OperationMode;
 
 char config_src_path[256];
 static int phandle = -1;
-static int operation_mode = REGISTERATION;
+static int operation_mode = REGISTRATION;
 
 typedef struct {
   char name[100];
@@ -355,7 +355,7 @@ static mrb_value mrb_ws_protocol_dissector(mrb_state *mrb, mrb_value self)
 
 static mrb_value mrb_ws_protocol_value(mrb_state *mrb, mrb_value _self)
 {
-  if (operation_mode == REGISTERATION) return mrb_nil_value();
+  if (operation_mode == REGISTRATION) return mrb_nil_value();
 
   // WIP: Need to add support other packet types --
   mrb_sym type_gint8  = (int)mrb_obj_to_sym(mrb, mrb_str_new_lit(mrb, "gint8"));
@@ -392,7 +392,7 @@ static mrb_value mrb_ws_protocol_config(mrb_state *mrb, mrb_value self)
 
   mrb_value mrb_config = mrb_nil_value();
 
-  if (operation_mode == REGISTERATION) mrb_config = mrb_funcall(mrb, proto, "register!", 0);
+  if (operation_mode == REGISTRATION) mrb_config = mrb_funcall(mrb, proto, "register!", 0);
   if (operation_mode == DISSECTION)    mrb_config = mrb_funcall(mrb, proto, "dissect!", 0);
 
   return mrb_config;
@@ -400,7 +400,7 @@ static mrb_value mrb_ws_protocol_config(mrb_state *mrb, mrb_value self)
 
 mrb_value mrb_ws_protocol_start(const char *pathname)
 {
-  if (operation_mode != REGISTERATION) {
+  if (operation_mode != REGISTRATION) {
     perror("mrb_ws_protocol_start() can only be executed when operation_mode is REGISTRATION!");
     exit(1);
   }
