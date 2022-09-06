@@ -1,6 +1,24 @@
 **This is a repository for building Wireshark with mruby. Wireshark's original Git repository: https://gitlab.com/wireshark/wireshark <br>
 The following README is from original.**
 
+- NOTE: This is an experimental attempt and does not support all of Wireshark's features.
+- Sorry but not tested on Windows.
+
+### How to add your own dissector with `wireshark_with_mruby`
+1. Download the source of this repo.
+2. Make a directory for the dissector under `plugins/`.
+3. Prepare your dissector source and support files in the directory.
+    - *config.`<YOUR PTOROCOL NAME>`.rb* - Your dissector source (Any file name is fine.)
+    - *CMakeLists.txt* - To build your dissector
+    - *packet-`<YOUR PTOROCOL NAME>`.c* - The entrypoint for building your dissector
+    - 📝 Samples of these files are available in [the foo plugin directory (plugins/epan/foo)](https://github.com/shioimm/wireshark_with_mruby/tree/master/plugins/epan/foo)
+4. Copy CMakeListsCustom.txt.example to CMakeListsCustom.txt in the top-level source directory, and add the path of your plugin in `CUSTOM_PLUGIN_SRC_DIR`.
+    - 📝 Sample of this file is available in [CMakeListsCustom.txt](https://github.com/shioimm/wireshark_with_mruby/tree/master/CMakeListsCustom.txt)
+5. Compile the dissector. To do this, you can refer to [3.7. Run Your Version Of Wireshark](https://www.wireshark.org/docs/wsdg_html_chunked/ChSrcRunFirstTime.html).
+6. Then you can add your own dissector to Wireshark in Ruby!
+
+[9.2.1. Setting up the dissector](https://www.wireshark.org/docs/wsdg_html_chunked/ChDissectAdd.html#ChDissectSetup) in [Wireshark Developer's Guide](https://www.wireshark.org/docs/wsdg_html_chunked/) may help you set up.
+
 ---
 
 General Information
